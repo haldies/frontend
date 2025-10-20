@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  body {
+    @apply min-h-screen min-w-[20rem] bg-slate-950 font-sans text-slate-100 antialiased;
+    background-image: radial-gradient(circle at top, rgba(99, 102, 241, 0.25), transparent 55%);
+  }
+
+  a {
+    @apply font-medium text-brand underline-offset-4 transition-colors hover:text-brand-foreground hover:underline;
+  }
+}

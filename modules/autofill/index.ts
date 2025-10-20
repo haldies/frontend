@@ -1,0 +1,1 @@
+export { SmartAutofillController } from './controller';

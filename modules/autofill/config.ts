@@ -1,0 +1,186 @@
+import { FIELD_KEYS, type FieldKey } from './keys';
+import type { FieldDefinition, ProfileFieldState } from './types';
+
+export const STORAGE_KEY = 'smartAutofillState/v1';
+export const MIN_DETECTION_SCORE = 38;
+
+export const FIELD_CONFIGS: Record<FieldKey, FieldDefinition> = {
+  fullName: {
+    label: 'Nama Lengkap',
+    placeholder: 'Contoh: Budi Santoso',
+    description: 'Mengisi kolom nama lengkap pada formulir.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['fullname', 'full_name', 'full name', 'name', 'nama', 'nama lengkap', 'person_name'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  email: {
+    label: 'Email',
+    placeholder: 'Contoh: budi@example.com',
+    description: 'Mengisi kolom email atau alamat surat elektronik.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['email', 'e-mail', 'mail', 'alamat email'],
+    inputKind: 'email',
+  },
+  phone: {
+    label: 'Nomor Telepon',
+    placeholder: 'Contoh: 021 1234 5678',
+    description: 'Mengisi kolom nomor telepon kantor atau rumah.',
+    defaultValue: '',
+    defaultEnabled: false,
+    keywords: ['phone', 'telepon', 'telp', 'telephone', 'contact number'],
+    inputKind: 'tel',
+  },
+  whatsapp: {
+    label: 'Nomors WhatsApp',
+    placeholder: 'Contoh: 0812 3456 7890',
+    description: 'Mengisi kolom nomor HP / WhatsApp / WA.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['whatsapp', 'whatsapps', 'whats app', 'wa', 'nomor wa', 'whatsapp number','nomor whatsapp'],
+    inputKind: 'tel',
+  },
+  company: {
+    label: 'Perusahaan',
+    placeholder: 'Contoh: PT Nusantara Makmur',
+    description: 'Mengisi kolom nama perusahaan atau organisasi.',
+    defaultValue: '',
+    defaultEnabled: false,
+    keywords: ['company', 'perusahaan', 'organization', 'organisasi', 'instansi', 'kantor'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  jobTitle: {
+    label: 'Jabatan',
+    placeholder: 'Contoh: Product Manager',
+    description: 'Mengisi kolom jabatan, posisi, atau role pekerjaan.',
+    defaultValue: '',
+    defaultEnabled: false,
+    keywords: ['jabatan', 'job', 'position', 'posisi', 'role', 'title', 'occupation'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  placeOfBirth: {
+    label: 'Tempat Lahir',
+    placeholder: 'Contoh: Jakarta',
+    description: 'Mengisi kolom tempat lahir / birth place.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['place of birth', 'birthplace', 'tempat lahir', 'pob', 'birth place'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  dateOfBirth: {
+    label: 'Tanggal Lahir',
+    placeholder: 'Contoh: 01/01/1995',
+    description: 'Mengisi kolom tanggal lahir (format dd/MM/yyyy).',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['date of birth', 'dob', 'tanggal lahir', 'birth date', 'birthdate'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  university: {
+    label: 'Universitas',
+    placeholder: 'Contoh: Universitas Indonesia',
+    description: 'Mengisi kolom nama universitas atau perguruan tinggi.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['university', 'universitas', 'college', 'campus', 'alma mater'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  educationLevel: {
+    label: 'Jenjang Pendidikan',
+    placeholder: 'Contoh: S1',
+    description: 'Mengisi kolom level pendidikan terakhir (SMA/SMK, D3, S1, S2, dst).',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['education level', 'level pendidikan', 'jenjang', 'degree level', 'education'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  major: {
+    label: 'Jurusan',
+    placeholder: 'Contoh: Teknik Informatika',
+    description: 'Mengisi kolom jurusan / program studi.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['major', 'jurusan', 'study program', 'program studi', 'department'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  gpa: {
+    label: 'GPA / IPK',
+    placeholder: 'Contoh: 3.75',
+    description: 'Mengisi kolom IPK atau GPA.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['gpa', 'ipk', 'grade point', 'nilai ipk'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  experience: {
+    label: 'Pengalaman',
+    placeholder: 'Contoh: 3 tahun pengalaman software engineer',
+    description: 'Mengisi kolom pengalaman kerja atau proyek.',
+    defaultValue: '',
+    defaultEnabled: false,
+    keywords: ['experience', 'pengalaman', 'work experience', 'years experience'],
+    inputKind: 'textarea',
+    requireKeyword: true,
+  },
+  expectedSalary: {
+    label: 'Ekspektasi Gaji',
+    placeholder: 'Contoh: Rp10.000.000',
+    description: 'Mengisi kolom ekspektasi gaji (gunakan Rupiah).',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['expected salary', 'salary expectation', 'gaji', 'salary'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  linkedin: {
+    label: 'Akun LinkedIn',
+    placeholder: 'Contoh: https://www.linkedin.com/in/username',
+    description: 'Mengisi kolom tautan akun LinkedIn atau profil profesional.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['linkedin', 'linked account', 'linked profile', 'linkedin url'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+  referralSource: {
+    label: 'Sumber Info Lowongan',
+    placeholder: 'Contoh: LinkedIn',
+    description: 'Mengisi kolom bagaimana Anda mengetahui lowongan ini.',
+    defaultValue: '',
+    defaultEnabled: true,
+    keywords: ['how did you hear', 'referral', 'vacancy', 'sumber informasi', 'source'],
+    inputKind: 'text',
+    requireKeyword: true,
+  },
+};
+
+export function createDefaultProfile(
+  initialValues: Partial<Record<FieldKey, string>> = {},
+): Record<FieldKey, ProfileFieldState> {
+  const profile = {} as Record<FieldKey, ProfileFieldState>;
+
+  FIELD_KEYS.forEach((key) => {
+    const config = FIELD_CONFIGS[key];
+    profile[key] = {
+      key,
+      label: config.label,
+      placeholder: config.placeholder,
+      description: config.description,
+      value: initialValues[key] ?? config.defaultValue ?? '',
+      enabled: config.defaultEnabled,
+      inputKind: config.inputKind,
+    };
+  });
+
+  return profile;
+}
