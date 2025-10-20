@@ -1,5 +1,5 @@
 {
-  "name": "wxt-react-starter",
+  "name": "fillai",
   "description": "manifest.json description",
   "private": true,
   "version": "0.0.0",
@@ -16,6 +16,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "lucide-react": "^0.546.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

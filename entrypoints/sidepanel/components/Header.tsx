@@ -13,7 +13,6 @@ const Header = ({ onReset, disabled }: HeaderProps): JSX.Element => {
           <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-sky-600 shadow-sm">
             Smart Autofill
           </span>
-          <h1 className="text-2xl font-semibold text-slate-900">Profil Profesional Instan</h1>
         </div>
         <button
           type="button"
@@ -24,10 +23,6 @@ const Header = ({ onReset, disabled }: HeaderProps): JSX.Element => {
           Reset
         </button>
       </div>
-      <p className="text-sm leading-relaxed text-slate-600">
-        Unggah CV atau resume berformat PDF untuk diubah menjadi profil autofill yang siap digunakan pada berbagai
-        formulir pendaftaran kerja.
-      </p>
     </header>
   );
 };

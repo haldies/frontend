@@ -9,22 +9,27 @@ import {
 import { FIELD_KEYS, type FieldKey } from '@/modules/autofill/keys';
 import { createDefaultProfile } from '@/modules/autofill/config';
 import type { ProfileFieldState } from '@/modules/autofill/types';
-import { loadStateFromStorage, saveStateToStorage, subscribeToStateChanges } from '@/modules/autofill/storage';
+import {
+  loadStateFromStorage,
+  saveStateToStorage,
+  subscribeToStateChanges,
+} from '@/modules/autofill/storage';
 import { extractProfileFromPdf } from './mockExtraction';
 import Header from './components/Header';
 import TabNavigation from './components/TabNavigation';
 import UploadCard from './components/UploadCard';
 import ExtractionProgressTimeline from './components/ExtractionProgressTimeline';
-import ProfileSummaryCard from './components/ProfileSummaryCard';
-import FieldsEditor from './components/FieldsEditor';
+import ChatbotPanel from './components/ChatbotPanel';
 import type { ExtractionStatus, StatusMeta, TabId } from './types';
+import ProfilePanel from './components/ProfileSummaryCard';
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'overview', label: 'Ringkasan' },
   { id: 'fields', label: 'Kustomisasi Field' },
+  { id: 'chatbot', label: 'Chatbot AI' },
 ];
 
-const PROGRESS_STEPS: Array<{ title: string; description: string }> = [
+const PROGRESS_STEPS = [
   {
     title: 'Mengunggah PDF',
     description: 'Memeriksa format dan mengamankan file sebelum pemrosesan.',
@@ -39,7 +44,14 @@ const PROGRESS_STEPS: Array<{ title: string; description: string }> = [
   },
 ];
 
-const HIGHLIGHT_KEYS: FieldKey[] = ['fullName', 'jobTitle', 'company', 'email', 'phone', 'linkedin'];
+const HIGHLIGHT_KEYS: FieldKey[] = [
+  'fullName',
+  'jobTitle',
+  'company',
+  'email',
+  'phone',
+  'linkedin',
+];
 
 const STATUS_META: Record<ExtractionStatus, StatusMeta> = {
   idle: {
@@ -88,10 +100,6 @@ function App(): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [progressStep, setProgressStep] = useState<number>(0);
   const progressTimers = useRef<number[]>([]);
-  const [panelOpen, setPanelOpen] = useState<boolean>(true);
-  const panelOpenRef = useRef<boolean>(panelOpen);
-  const profileLoadedRef = useRef<boolean>(false);
-  const pendingProfileRef = useRef<Record<FieldKey, ProfileFieldState> | null>(null);
 
   const isProcessing = status === 'processing';
   const statusMeta = STATUS_META[status];
@@ -107,88 +115,13 @@ function App(): JSX.Element {
     return lastUpdatedAt ? formatTime(lastUpdatedAt) : null;
   }, [lastUpdatedAt]);
 
-  const clearProgressTimers = () => {
-    progressTimers.current.forEach((timerId) => window.clearTimeout(timerId));
-    progressTimers.current = [];
-  };
-
-  useEffect(() => {
-    panelOpenRef.current = panelOpen;
-  }, [panelOpen]);
-
-  useEffect(() => {
-    return () => {
-      clearProgressTimers();
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      const loaded = await loadStateFromStorage();
-      if (cancelled) {
-        return;
-      }
-      const nextProfile = pendingProfileRef.current ?? loaded.profile;
-      setProfile(nextProfile);
-      setPanelOpen(loaded.panelOpen);
-      panelOpenRef.current = loaded.panelOpen;
-      profileLoadedRef.current = true;
-
-      if (pendingProfileRef.current) {
-        const queuedProfile = pendingProfileRef.current;
-        pendingProfileRef.current = null;
-        void saveStateToStorage({
-          panelOpen: panelOpenRef.current,
-          profile: queuedProfile,
-        });
-      }
-    })();
-
-    const unsubscribe = subscribeToStateChanges((nextState) => {
-      profileLoadedRef.current = true;
-      pendingProfileRef.current = null;
-      if (cancelled) {
-        return;
-      }
-      setProfile(nextState.profile);
-      setPanelOpen(nextState.panelOpen);
-      panelOpenRef.current = nextState.panelOpen;
-    });
-
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, []);
-
-  const persistProfile = (nextProfile: Record<FieldKey, ProfileFieldState>) => {
-    if (!profileLoadedRef.current) {
-      pendingProfileRef.current = nextProfile;
-      return;
-    }
-
-    pendingProfileRef.current = null;
-    void saveStateToStorage({
-      panelOpen: panelOpenRef.current,
-      profile: nextProfile,
-    });
-  };
-
-  const handleToggle = (key: FieldKey) => {
-    setProfile((prev) => {
-      const next = { ...prev };
-      next[key] = { ...prev[key], enabled: !prev[key].enabled };
-      persistProfile(next);
-      return next;
-    });
+  const persistProfile = (next: Record<FieldKey, ProfileFieldState>) => {
+    void saveStateToStorage({ panelOpen: true, profile: next });
   };
 
   const handleValueChange = (key: FieldKey, value: string) => {
     setProfile((prev) => {
-      const next = { ...prev };
-      next[key] = { ...prev[key], value };
+      const next = { ...prev, [key]: { ...prev[key], value } };
       persistProfile(next);
       return next;
     });
@@ -198,9 +131,7 @@ function App(): JSX.Element {
     const file = event.target.files?.[0];
     event.target.value = '';
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setStatus('error');
@@ -215,53 +146,33 @@ function App(): JSX.Element {
     setUploadedFileName(file.name);
     setLastUpdatedAt(null);
 
-    clearProgressTimers();
     setProgressStep(1);
-    progressTimers.current.push(
-      window.setTimeout(() => {
-        setProgressStep(2);
-      }, 1200),
-    );
-    progressTimers.current.push(
-      window.setTimeout(() => {
-        setProgressStep(3);
-      }, 2400),
-    );
+    setTimeout(() => setProgressStep(2), 1200);
+    setTimeout(() => setProgressStep(3), 2400);
 
     try {
       const extracted = await extractProfileFromPdf(file);
       setProfile((prev) => {
         const next = { ...prev };
         FIELD_KEYS.forEach((key) => {
-          const previous = prev[key];
-          const incoming = extracted[key];
-          next[key] = {
-            ...previous,
-            value: typeof incoming === 'string' ? incoming : previous.value,
-          };
+          next[key] = { ...prev[key], value: extracted[key] || prev[key].value };
         });
         persistProfile(next);
         return next;
       });
       setStatus('success');
-      setProgressStep(3);
       setLastUpdatedAt(new Date());
-    } catch (ex) {
-      console.error('Failed to extract profile from PDF', ex);
+    } catch (err) {
+      console.error(err);
       setStatus('error');
-      setError('Terjadi kesalahan saat memproses PDF. Coba lagi.');
-      setProgressStep(0);
-    } finally {
-      clearProgressTimers();
+      setError('Terjadi kesalahan saat memproses PDF.');
     }
   };
 
   const handleReset = () => {
-    clearProgressTimers();
     const resetProfile = createEmptyProfile();
     setProfile(resetProfile);
     setStatus('idle');
-    setActiveTab('overview');
     setUploadedFileName(null);
     setLastUpdatedAt(null);
     setError(null);
@@ -269,13 +180,11 @@ function App(): JSX.Element {
     persistProfile(resetProfile);
   };
 
-  return (
-    <div className="flex min-h-[38rem] w-[40rem] max-w-full flex-col gap-6 border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-indigo-100 p-7 text-slate-900 shadow-[0_40px_70px_-35px_rgba(30,64,175,0.55)]">
-      <Header onReset={handleReset} disabled={isProcessing && !uploadedFileName} />
-
-      <TabNavigation tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
-
-      {activeTab === 'overview' ? (
+  // 🧭 Tab handler
+  let tabContent: JSX.Element;
+  switch (activeTab) {
+    case 'overview':
+      tabContent = (
         <section className="flex flex-col gap-5">
           <UploadCard
             status={status}
@@ -288,21 +197,50 @@ function App(): JSX.Element {
             error={error}
             onFileChange={handleFileChange}
             progressTimeline={
-              <ExtractionProgressTimeline status={status} progressStep={progressStep} steps={PROGRESS_STEPS} />
+              <ExtractionProgressTimeline
+                status={status}
+                progressStep={progressStep}
+                steps={PROGRESS_STEPS}
+              />
             }
           />
-
-          {(status === 'processing' || status === 'success') && (
-            <ProfileSummaryCard
-              profile={profile}
-              highlightKeys={HIGHLIGHT_KEYS}
-              onEditClick={() => setActiveTab('fields')}
-            />
-          )}
         </section>
-      ) : (
-        <FieldsEditor profile={profile} onToggle={handleToggle} onValueChange={handleValueChange} />
-      )}
+      );
+      break;
+
+    case 'fields':
+      tabContent = (
+        <ProfilePanel
+          profile={profile}
+          onValueChange={handleValueChange}
+        />
+      );
+      break;
+
+    case 'chatbot':
+      tabContent = (
+        <ChatbotPanel
+          profile={profile}
+          status={status}
+          highlightKeys={HIGHLIGHT_KEYS}
+          filledCount={filledCount}
+          totalFields={FIELD_KEYS.length}
+          onEditProfile={() => setActiveTab('fields')}
+        />
+      );
+      break;
+
+    default:
+      tabContent = <div>Tab tidak ditemukan</div>;
+  }
+
+  return (
+    <div className="flex min-h-[38rem] max-w-full flex-col gap-6 border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-indigo-100 pt-7 pb-7 pl-7 text-slate-900 shadow-[0_40px_70px_-35px_rgba(30,64,175,0.55)]">
+      <Header onReset={handleReset} disabled={isProcessing && !!uploadedFileName} />
+      <div className="flex flex-1 gap-6">
+        <div className="flex-1">{tabContent}</div>
+        <TabNavigation tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+      </div>
     </div>
   );
 }
