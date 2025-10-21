@@ -53,7 +53,7 @@ export const FIELD_CONFIGS: Record<FieldKey, FieldDefinition> = {
       'nomor whatsapp',
       'whatsapps',
       'whats app',
-      'nomor wa',
+      'nomor wa',"Whats Apps Number",
     ],
     inputKind: 'tel',
   },

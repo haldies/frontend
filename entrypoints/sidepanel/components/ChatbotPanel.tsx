@@ -432,7 +432,7 @@ export default function ChatbotPanel({
               const isTyping = msg.mood === 'typing';
               const isError = msg.mood === 'error';
               const bubbleClass = isUser
-                ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md'
+                ? 'shadow-md'
                 : isTyping
                   ? 'border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-indigo-100 text-indigo-600 shadow-sm'
                   : isError
