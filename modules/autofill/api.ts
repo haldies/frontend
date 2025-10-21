@@ -7,23 +7,55 @@ type ProfileResponse = {
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8000';
 let cachedBaseUrl: string | null = null;
+let profilePayloadCache: Record<string, unknown> | null = null;
 
 function normalizeUrl(url: string): string {
   return url.endsWith('/') ? url.slice(0, -1) : url;
 }
 
-export function getApiBaseUrl(): string {
-  if (cachedBaseUrl) {
-    return cachedBaseUrl;
+function normalizeValueForField(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return value;
   }
-
-  const raw =
-    (import.meta.env?.VITE_EXTRACTION_API_URL as string | undefined) ?? DEFAULT_API_BASE_URL;
-  cachedBaseUrl = normalizeUrl(raw);
-  return cachedBaseUrl;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => {
+        if (item && typeof item === 'object') {
+          const record = item as Record<string, unknown>;
+          const role = typeof record.role === 'string' ? record.role.trim() : '';
+          const company = typeof record.company === 'string' ? record.company.trim() : '';
+          const period = typeof record.period === 'string' ? record.period.trim() : '';
+          const description =
+            typeof record.description === 'string' ? record.description.trim() : '';
+          const headline = [role, company, period].filter(Boolean).join(' • ');
+          const details = [headline, description].filter(Boolean);
+          if (details.length > 0) {
+            return details.join('\n');
+          }
+          return '';
+        }
+        if (typeof item === 'string') {
+          return item.trim();
+        }
+        if (typeof item === 'number' || typeof item === 'boolean') {
+          return String(item);
+        }
+        return '';
+      })
+      .filter((item) => item.length > 0);
+    return items.length > 0 ? items.join('\n') : undefined;
+  }
+  return undefined;
 }
 
-export async function fetchProfileTemplate(): Promise<Partial<Record<FieldKey, string>>> {
+async function fetchProfilePayload(): Promise<Record<string, unknown>> {
+  if (profilePayloadCache) {
+    return profilePayloadCache;
+  }
+
   const endpoint = `${getApiBaseUrl()}/api/profile`;
   let response: Response;
 
@@ -47,19 +79,44 @@ export async function fetchProfileTemplate(): Promise<Partial<Record<FieldKey, s
     throw new Error('Data profil tidak valid.');
   }
 
-  const source = (payload?.profile && typeof payload.profile === 'object'
-    ? payload.profile
-    : payload) as Record<string, unknown> | undefined;
+  const source =
+    payload && typeof payload === 'object'
+      ? (payload.profile && typeof payload.profile === 'object'
+          ? (payload.profile as Record<string, unknown>)
+          : (payload as unknown as Record<string, unknown>))
+      : {};
 
-  const result: Partial<Record<FieldKey, string>> = {};
-  if (!source) {
-    return result;
+  profilePayloadCache = source ?? {};
+  return profilePayloadCache;
+}
+
+export function getApiBaseUrl(): string {
+  if (cachedBaseUrl) {
+    return cachedBaseUrl;
   }
 
+  const raw =
+    (import.meta.env?.VITE_EXTRACTION_API_URL as string | undefined) ?? DEFAULT_API_BASE_URL;
+  cachedBaseUrl = normalizeUrl(raw);
+  return cachedBaseUrl;
+}
+
+export function getCachedProfilePayload(): Record<string, unknown> | null {
+  return profilePayloadCache;
+}
+
+export async function ensureProfilePayload(): Promise<Record<string, unknown>> {
+  return fetchProfilePayload();
+}
+
+export async function fetchProfileTemplate(): Promise<Partial<Record<FieldKey, string>>> {
+  const source = await fetchProfilePayload();
+  const result: Partial<Record<FieldKey, string>> = {};
+
   FIELD_KEYS.forEach((key) => {
-    const value = source[key];
-    if (typeof value === 'string') {
-      result[key] = value;
+    const normalized = normalizeValueForField(source[key]);
+    if (typeof normalized === 'string' && normalized.trim().length > 0) {
+      result[key] = normalized;
     }
   });
 

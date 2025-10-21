@@ -5,7 +5,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
 
   manifest: {
-    permissions: ['sidePanel'],
+    permissions: ['sidePanel', 'tabs'],
     side_panel: {
       default_path: 'sidepanel.html',
     },

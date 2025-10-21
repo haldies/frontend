@@ -1,135 +1,378 @@
 import { useMemo } from 'react';
 import type { JSX } from 'react';
-import type { FieldKey } from '@/modules/autofill/keys';
 import type { ProfileFieldState } from '@/modules/autofill/types';
-import { User, Pen } from 'lucide-react';
+import { User, Pen, Mail, Phone, Linkedin, MapPin, Sparkles } from 'lucide-react';
 
 interface ProfilePanelProps {
-  profile: Record<FieldKey, ProfileFieldState>;
-  onEditClick: (section?: string) => void;
+  profile: Record<string, unknown>;
+  onEditClick?: (section?: string) => void;
+}
+
+type ExperienceEntry = {
+  role?: string;
+  company?: string;
+  period?: string;
+  description?: string;
+  summary?: string;
+};
+
+function isProfileFieldState(value: unknown): value is ProfileFieldState {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      'value' in (value as Record<string, unknown>) &&
+      typeof (value as { value?: unknown }).value !== 'undefined',
+  );
+}
+
+function toStringValue(value: unknown): string {
+  if (isProfileFieldState(value)) {
+    const raw = (value as ProfileFieldState).value;
+    return typeof raw === 'string' ? raw : raw != null ? String(raw) : '';
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return '';
+}
+
+function getRawValue(profile: Record<string, unknown>, key: string): unknown {
+  if (!profile) {
+    return undefined;
+  }
+
+  if (key in profile) {
+    return profile[key];
+  }
+
+  const nested = profile.profile;
+  if (nested && typeof nested === 'object' && nested !== null) {
+    const nestedRecord = nested as Record<string, unknown>;
+    if (key in nestedRecord) {
+      return nestedRecord[key];
+    }
+  }
+
+  return undefined;
+}
+
+function getStringValue(profile: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = toStringValue(getRawValue(profile, key)).trim();
+    if (value.length > 0) {
+      return value;
+    }
+  }
+  return '';
+}
+
+function normalizeExperience(value: unknown): ExperienceEntry[] {
+  const raw = isProfileFieldState(value) ? value.value : value;
+
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+
+        const record = item as Record<string, unknown>;
+        const role = toStringValue(record.role).trim() || toStringValue(record.title).trim();
+        const company = toStringValue(record.company).trim();
+        const period = toStringValue(record.period).trim();
+        const description = toStringValue(record.description).trim();
+
+        if (!role && !company && !period && !description) {
+          return null;
+        }
+
+        return {
+          role: role || undefined,
+          company: company || undefined,
+          period: period || undefined,
+          description: description || undefined,
+        };
+      })
+      .filter((item): item is ExperienceEntry => Boolean(item));
+  }
+
+  if (typeof raw === 'string') {
+    const lines = raw
+      .split(/\r?\n+/)
+      .map((line) => line.replace(/^[•\-\*]\s*/, '').trim())
+      .filter((line) => line.length > 0);
+
+    return lines.map((line) => ({ summary: line }));
+  }
+
+  return [];
+}
+
+function normalizeSkills(value: unknown): string[] {
+  const raw = isProfileFieldState(value) ? value.value : value;
+
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => toStringValue(item).trim())
+      .filter((item) => item.length > 0);
+  }
+
+  if (typeof raw === 'string') {
+    return raw
+      .split(/[,;\n]+/)
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+
+  return [];
 }
 
 const ProfilePanel = ({ profile, onEditClick }: ProfilePanelProps): JSX.Element => {
-  const fullName = profile.fullName?.value ?? '';
-  const jobTitle = profile.jobTitle?.value ?? '';
-  const company = profile.company?.value ?? '';
-  const about = profile.about?.value ?? '';
+  const fullName = getStringValue(profile, 'fullName');
+  const jobTitle = getStringValue(profile, 'jobTitle');
+  const company = getStringValue(profile, 'company');
+  const about = getStringValue(profile, 'aboutMe', 'about', 'summary');
 
-  const initials = useMemo(() => {
-    const segments = fullName.trim().split(/\s+/).slice(0, 2);
-    return segments.map((s) => s[0]?.toUpperCase() ?? '').join('') || 'NU';
-  }, [fullName]);
+  const email = getStringValue(profile, 'email');
+  const phone = getStringValue(profile, 'phone', 'whatsapp');
+  const linkedin = getStringValue(profile, 'linkedin');
+  const address = getStringValue(profile, 'address');
+  const placeOfBirth = getStringValue(profile, 'placeOfBirth');
+  const dateOfBirth = getStringValue(profile, 'dateOfBirth');
 
-  const infoGroups: Array<{ id: string; title: string; fields: FieldKey[] }> = [
-    {
-      id: 'contact',
-      title: 'Kontak & Sosial',
-      fields: ['email', 'phone', 'linkedin'],
-    },
-    {
-      id: 'education',
-      title: 'Pendidikan',
-      fields: ['university', 'major', 'educationLevel', 'gpa'],
-    },
-    {
-      id: 'career',
-      title: 'Karier & Preferensi',
-      fields: ['experience', 'expectedSalary'],
-    },
-  ];
+  const university = getStringValue(profile, 'university');
+  const major = getStringValue(profile, 'major');
+  const educationLevel = getStringValue(profile, 'educationLevel');
+  const gpa = getStringValue(profile, 'gpa');
+
+  const experiences = normalizeExperience(getRawValue(profile, 'experience'));
+  const skills = normalizeSkills(getRawValue(profile, 'skills'));
+
+  const experienceEntries =
+    experiences.length > 0
+      ? experiences
+      : (() => {
+          const fallbackTitle = [jobTitle, company].filter(Boolean).join(' • ');
+          return fallbackTitle ? [{ summary: fallbackTitle }] : [];
+        })();
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-6 shadow-sm hover:shadow-md transition-all duration-300">
-      {/* Header Utama */}
-      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6 text-center sm:text-left">
-        <div className="flex items-center gap-4">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-500 text-2xl font-semibold text-white shadow-md ring-4 ring-indigo-100">
-            {initials || <User size={36} />}
-          </div>
+      {/* Header */}
+      <header className="flex flex-col gap-6 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+        <div className="flex items-center ">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">{fullName.trim() || 'Nama Kandidat'}</h2>
-            <p className="text-sm text-slate-600">{jobTitle || 'Posisi belum diisi'}</p>
-            <p className="text-xs text-slate-400">{company || 'Perusahaan belum diisi'}</p>
+            <h2 className="text-xl font-semibold text-slate-900">
+              {fullName.trim() || 'Nama Kandidat'}
+            </h2>
+            <div className="mt-3 flex flex-wrap justify-center gap-3 text-sm text-slate-600 sm:justify-start">
+              {email && (
+                <span className="inline-flex items-center gap-1">
+                  <Mail size={14} className="text-indigo-500" /> {email}
+                </span>
+              )}
+              {phone && (
+                <span className="inline-flex items-center gap-1">
+                  <Phone size={14} className="text-indigo-500" /> {phone}
+                </span>
+              )}
+              {linkedin && (
+                <a
+                  href={linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 hover:text-indigo-600 transition"
+                >
+                  <Linkedin size={14} className="text-indigo-500" /> LinkedIn
+                </a>
+              )}
+              {address && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin size={14} className="text-indigo-500" /> {address}
+                </span>
+              )}
+              {!email && !phone && !linkedin && (
+                <span className="text-slate-400 text-xs italic">Belum ada kontak</span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Tombol Edit Semua */}
-        <button
-          type="button"
-          onClick={() => onEditClick()}
-          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 hover:shadow"
-        >
-          <Pen size={16} /> Ubah Profil
-        </button>
+        {onEditClick ? (
+          <button
+            type="button"
+            onClick={() => onEditClick()}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 hover:shadow"
+          >
+            <Pen size={16} /> Ubah Profil
+          </button>
+        ) : null}
       </header>
 
       <div className="my-6 border-t border-slate-200" />
 
-      {/* About Section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-indigo-500">
-            Tentang Saya
-          </h3>
-          <button
-            type="button"
-            onClick={() => onEditClick('about')}
-            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-500 hover:border-indigo-300 hover:text-indigo-600 transition"
-          >
-            <Pen size={13} /> Ubah
-          </button>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 shadow-sm hover:border-indigo-200 transition">
-          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-            {about?.trim().length ? about : (
-              <span className="text-slate-400">Belum ada deskripsi tentang diri Anda.</span>
-            )}
-          </p>
-        </div>
-      </div>
+      {/* Tentang Saya */}
+      <section>
+        <SectionHeader title="Tentang Saya" sectionKey="about" onEdit={onEditClick} />
+        <CardText value={about} placeholder="Belum ada deskripsi tentang diri Anda." />
+      </section>
 
-      {/* Section Data */}
-      <div className="space-y-8">
-        {infoGroups.map((group) => (
-          <div key={group.id}>
-            {/* Judul Section */}
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-indigo-500">
-                {group.title}
-              </h3>
-              <button
-                type="button"
-                onClick={() => onEditClick(group.id)}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-500 hover:border-indigo-300 hover:text-indigo-600 transition"
+      {/* Informasi Pribadi */}
+      <section className="mt-8">
+        <SectionHeader title="Informasi Pribadi" sectionKey="personal" onEdit={onEditClick} />
+        <CardList
+          items={[
+            placeOfBirth && dateOfBirth
+              ? `Tempat & Tanggal Lahir: ${placeOfBirth}, ${dateOfBirth}`
+              : placeOfBirth
+                ? `Tempat Lahir: ${placeOfBirth}`
+                : dateOfBirth
+                  ? `Tanggal Lahir: ${dateOfBirth}`
+                  : undefined,
+            address && !address.includes(placeOfBirth) ? `Domisili: ${address}` : undefined,
+          ]}
+        />
+      </section>
+
+      {/* Pendidikan */}
+      <section className="mt-8">
+        <SectionHeader title="Pendidikan" sectionKey="education" onEdit={onEditClick} />
+        <CardList
+          items={[
+            university ? `Universitas: ${university}` : undefined,
+            major ? `Jurusan: ${major}` : undefined,
+            educationLevel ? `Jenjang: ${educationLevel}` : undefined,
+            gpa ? `IPK: ${gpa}` : undefined,
+          ]}
+        />
+      </section>
+
+      {/* Pengalaman */}
+      <section className="mt-8">
+        <SectionHeader title="Pengalaman" sectionKey="career" onEdit={onEditClick} />
+        <ExperienceList items={experienceEntries} />
+      </section>
+
+      {/* Keahlian */}
+      <section className="mt-8">
+        <SectionHeader title="Keahlian" sectionKey="skills" onEdit={onEditClick} />
+        {skills.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {skills.map((skill) => (
+              <span
+                key={skill}
+                className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50/70 px-3 py-1 text-sm text-indigo-600 shadow-sm"
               >
-                <Pen size={13} /> Ubah
-              </button>
-            </div>
-
-            {/* Data Field */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              {group.fields.map((key) => {
-                const field = profile[key];
-                const value = field?.value?.trim();
-                return (
-                  <div
-                    key={key}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:border-indigo-200 hover:shadow transition"
-                  >
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                      {field?.label || key}
-                    </p>
-                    <p className="text-sm font-medium text-slate-800">
-                      {value?.length ? value : <span className="text-slate-400">Belum ada data</span>}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+                <Sparkles size={14} className="text-indigo-500" />
+                {skill}
+              </span>
+            ))}
           </div>
-        ))}
-      </div>
+        ) : (
+          <span className="text-slate-400 text-sm">Belum ada data keahlian</span>
+        )}
+      </section>
     </section>
+  );
+};
+
+/* === Reusable Components === */
+const AvatarFallback = ({ fullName }: { fullName: string }) => {
+  const initials = useMemo(() => {
+    const segments = fullName.trim().split(/\s+/).slice(0, 2);
+    return segments.map((segment) => segment[0]?.toUpperCase() ?? '').join('');
+  }, [fullName]);
+
+  return initials ? <span>{initials}</span> : <User size={36} />;
+};
+
+const SectionHeader = ({
+  title,
+  sectionKey,
+  onEdit,
+}: {
+  title: string;
+  sectionKey?: string;
+  onEdit?: (section?: string) => void;
+}) => (
+  <div className="mb-3 flex items-center justify-between">
+    <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-indigo-500">{title}</h3>
+    {onEdit ? (
+      <button
+        type="button"
+        onClick={() => onEdit(sectionKey)}
+        className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-500 transition hover:border-indigo-300 hover:text-indigo-600"
+      >
+        <Pen size={13} /> Ubah
+      </button>
+    ) : null}
+  </div>
+);
+
+const CardText = ({ value, placeholder }: { value?: string; placeholder: string }) => (
+  <div className="rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 shadow-sm hover:border-indigo-200 transition">
+    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+      {value?.trim()?.length ? value : <span className="text-slate-400">{placeholder}</span>}
+    </p>
+  </div>
+);
+
+const CardList = ({ items }: { items: (string | undefined)[] }) => (
+  <div className="flex flex-wrap gap-2">
+    {items.filter(Boolean).length > 0 ? (
+      items.filter(Boolean).map((item, i) => (
+        <span
+          key={i}
+          className="bg-slate-50 border border-slate-100 rounded-full px-3 py-1 text-sm text-slate-700"
+        >
+          {item}
+        </span>
+      ))
+    ) : (
+      <span className="text-slate-400 text-sm">Belum ada data</span>
+    )}
+  </div>
+);
+
+const ExperienceList = ({ items }: { items: ExperienceEntry[] }) => {
+  if (!items.length) {
+    return <span className="text-slate-400 text-sm">Belum ada data pengalaman</span>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => {
+        const key = [item.role, item.company, item.period, item.summary, index].filter(Boolean).join('-');
+        return (
+          <div
+            key={key || index}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+          >
+            {item.summary ? (
+              <p className="text-sm text-slate-700 leading-relaxed">{item.summary}</p>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-900">
+                  {[item.role, item.company].filter(Boolean).join(' • ') || 'Pengalaman'}
+                </p>
+                {item.period && <p className="text-xs text-slate-500">{item.period}</p>}
+                {item.description && (
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                    {item.description}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 };
 

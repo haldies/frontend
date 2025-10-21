@@ -1,6 +1,7 @@
 import {
   type ChangeEvent,
   type JSX,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -8,11 +9,12 @@ import {
 } from 'react';
 import { FIELD_KEYS, type FieldKey } from '@/modules/autofill/keys';
 import { createDefaultProfile } from '@/modules/autofill/config';
-import type { ProfileFieldState } from '@/modules/autofill/types';
+import type { AutoFillState, ProfileFieldState } from '@/modules/autofill/types';
 import {
   loadStateFromStorage,
   saveStateToStorage,
   subscribeToStateChanges,
+  subscribeToStateMessages,
 } from '@/modules/autofill/storage';
 import { extractProfileFromPdf } from './mockExtraction';
 import Header from './components/Header';
@@ -22,6 +24,10 @@ import ExtractionProgressTimeline from './components/ExtractionProgressTimeline'
 import ChatbotPanel from './components/ChatbotPanel';
 import type { ExtractionStatus, StatusMeta, TabId } from './types';
 import ProfilePanel from './components/ProfileSummaryCard';
+import {
+  ensureProfilePayload,
+  getCachedProfilePayload,
+} from '@/modules/autofill/api';
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'overview', label: 'Ringkasan' },
@@ -99,6 +105,9 @@ function App(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [progressStep, setProgressStep] = useState<number>(0);
+  const [profilePayload, setProfilePayload] = useState<Record<string, unknown> | null>(
+    () => getCachedProfilePayload(),
+  );
   const progressTimers = useRef<number[]>([]);
 
   const isProcessing = status === 'processing';
@@ -106,7 +115,7 @@ function App(): JSX.Element {
 
   const filledCount = useMemo(() => {
     return FIELD_KEYS.reduce((count, key) => {
-      const value = profile[key].value.trim();
+      const value = profile[key]?.value.trim() ?? '';
       return value.length > 0 ? count + 1 : count;
     }, 0);
   }, [profile]);
@@ -114,6 +123,84 @@ function App(): JSX.Element {
   const formattedUpdatedAt = useMemo(() => {
     return lastUpdatedAt ? formatTime(lastUpdatedAt) : null;
   }, [lastUpdatedAt]);
+
+  const summaryProfile = useMemo(() => {
+    const base: Record<string, unknown> = profilePayload ? { ...profilePayload } : {};
+
+    FIELD_KEYS.forEach((key) => {
+      const current = profile[key]?.value;
+      if (typeof current !== 'undefined' && current !== null) {
+        base[key] = current;
+      }
+    });
+
+    return base;
+  }, [profile, profilePayload]);
+
+  const applyExternalState = useCallback(
+    (nextState: AutoFillState) => {
+      setProfile(nextState.profile);
+      const hasValue = FIELD_KEYS.some((key) => nextState.profile[key]?.value?.trim());
+      if (hasValue) {
+        setStatus((prev) => (prev === 'idle' ? 'success' : prev));
+        setLastUpdatedAt(new Date());
+      }
+    },
+    [setLastUpdatedAt, setProfile, setStatus],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void ensureProfilePayload()
+      .then((payload) => {
+        if (active) {
+          setProfilePayload(payload);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setProfilePayload(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const applyIfActive = (next: AutoFillState) => {
+      if (!cancelled) {
+        applyExternalState(next);
+      }
+    };
+
+    void loadStateFromStorage()
+      .then((initialState) => {
+        applyIfActive(initialState);
+      })
+      .catch((error) => {
+        console.warn('Smart Autofill sidepanel: gagal memuat data awal', error);
+      });
+
+    const unsubscribes = [
+      subscribeToStateChanges(applyIfActive),
+      subscribeToStateMessages(applyIfActive),
+    ];
+
+    return () => {
+      cancelled = true;
+      unsubscribes.forEach((unsubscribe) => {
+        try {
+          unsubscribe();
+        } catch {
+          // ignore unsubscribe errors
+        }
+      });
+    };
+  }, [applyExternalState]);
 
   const persistProfile = (next: Record<FieldKey, ProfileFieldState>) => {
     void saveStateToStorage({ panelOpen: true, profile: next });
@@ -125,6 +212,7 @@ function App(): JSX.Element {
       persistProfile(next);
       return next;
     });
+    setLastUpdatedAt(new Date());
   };
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -211,8 +299,7 @@ function App(): JSX.Element {
     case 'fields':
       tabContent = (
         <ProfilePanel
-          profile={profile}
-          onValueChange={handleValueChange}
+          profile={summaryProfile}
         />
       );
       break;
@@ -234,11 +321,16 @@ function App(): JSX.Element {
       tabContent = <div>Tab tidak ditemukan</div>;
   }
 
+  const tabWrapperClassName =
+    activeTab === 'chatbot'
+      ? 'flex flex-1 min-h-0'
+      : 'flex-1 min-h-0 overflow-y-auto pr-1';
+
   return (
-    <div className="flex min-h-[38rem] max-w-full flex-col gap-6 border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-indigo-100 pt-7 pb-7 pl-7 text-slate-900 shadow-[0_40px_70px_-35px_rgba(30,64,175,0.55)]">
+    <div className="flex h-screen max-w-full flex-col gap-6 overflow-hidden border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-indigo-100 pt-7 pb-7 pl-7 text-slate-900 shadow-[0_40px_70px_-35px_rgba(30,64,175,0.55)]">
       <Header onReset={handleReset} disabled={isProcessing && !!uploadedFileName} />
-      <div className="flex flex-1 gap-6">
-        <div className="flex-1">{tabContent}</div>
+      <div className="flex flex-1 gap-6 overflow-hidden">
+        <div className={tabWrapperClassName}>{tabContent}</div>
         <TabNavigation tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
       </div>
     </div>
