@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree -I 'node_modules|.git|\\.output' -L 3)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enabledMcpjsonServers": [
+    "context7"
+  ],
+  "enableAllProjectMcpServers": true
+}

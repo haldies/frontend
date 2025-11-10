@@ -1,5 +1,4 @@
-import { FIELD_KEYS } from './keys';
-import { createDefaultProfile } from './config';
+import { createDefaultProfile, getFieldConfigKeysSync } from './config';
 import type { AutoFillState, DetectionMap, PersistedState, ProfileFieldState } from './types';
 import type { FieldKey } from './keys';
 
@@ -15,8 +14,9 @@ export function mergeState(base: AutoFillState, persisted: PersistedState | unde
     panelOpen: base.panelOpen,
     profile: {} as Record<FieldKey, ProfileFieldState>,
   };
+  const keys = getFieldConfigKeysSync();
 
-  FIELD_KEYS.forEach((key) => {
+  keys.forEach((key) => {
     const sourceField = base.profile[key];
     next.profile[key] = { ...sourceField };
   });
@@ -31,7 +31,7 @@ export function mergeState(base: AutoFillState, persisted: PersistedState | unde
     next.panelOpen = base.panelOpen;
   }
 
-  FIELD_KEYS.forEach((key) => {
+  keys.forEach((key) => {
     const baseField = base.profile[key];
     const targetField = next.profile[key];
     const storedField = persisted.profile?.[key];
@@ -53,7 +53,8 @@ export function mergeState(base: AutoFillState, persisted: PersistedState | unde
 
 export function toPersistedState(state: AutoFillState): PersistedState {
   const profile = {} as PersistedState['profile'];
-  FIELD_KEYS.forEach((key) => {
+  const keys = Object.keys(state.profile) as FieldKey[];
+  keys.forEach((key) => {
     profile![key] = {
       enabled: state.profile[key].enabled,
       value: state.profile[key].value,
@@ -68,19 +69,19 @@ export function toPersistedState(state: AutoFillState): PersistedState {
 
 export function createEmptyDetectionMap(): DetectionMap {
   const map = {} as DetectionMap;
-  FIELD_KEYS.forEach((key) => {
+  getFieldConfigKeysSync().forEach((key) => {
     map[key] = [];
   });
   return map;
 }
 
 export function countReadyMatches(detections: DetectionMap): number {
-  return FIELD_KEYS.reduce((count, key) => {
+  return getFieldConfigKeysSync().reduce((count, key) => {
     const matches = detections[key];
     return matches && matches.length > 0 ? count + 1 : count;
   }, 0);
 }
 
 export function getFieldKeys(): FieldKey[] {
-  return [...FIELD_KEYS];
+  return getFieldConfigKeysSync();
 }

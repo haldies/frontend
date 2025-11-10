@@ -7,27 +7,33 @@ import {
   useRef,
   useState,
 } from 'react';
-import { FIELD_KEYS, type FieldKey } from '@/modules/autofill/keys';
-import { createDefaultProfile } from '@/modules/autofill/config';
+import type { FieldKey } from '@/modules/autofill/keys';
+import {
+  createDefaultProfile,
+  ensureFieldConfigsReady,
+  getFieldConfigKeysSync,
+  subscribeToFieldConfigChanges,
+} from '@/modules/autofill/config';
 import type { AutoFillState, ProfileFieldState } from '@/modules/autofill/types';
+import type { ExtractionStatus, StatusMeta, TabId } from './types';
+
 import {
   loadStateFromStorage,
   saveStateToStorage,
   subscribeToStateChanges,
   subscribeToStateMessages,
 } from '@/modules/autofill/storage';
+
 import { extractProfileFromPdf } from './mockExtraction';
 import Header from './components/Header';
 import TabNavigation from './components/TabNavigation';
 import UploadCard from './components/UploadCard';
 import ExtractionProgressTimeline from './components/ExtractionProgressTimeline';
 import ChatbotPanel from './components/ChatbotPanel';
-import type { ExtractionStatus, StatusMeta, TabId } from './types';
+
+import FieldConfigManager from './components/FieldForm';
 import ProfilePanel from './components/ProfileSummaryCard';
-import {
-  ensureProfilePayload,
-  getCachedProfilePayload,
-} from '@/modules/autofill/api';
+import FieldForm from './components/FieldForm';
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'overview', label: 'Ringkasan' },
@@ -84,7 +90,7 @@ const STATUS_META: Record<ExtractionStatus, StatusMeta> = {
 
 function createEmptyProfile(): Record<FieldKey, ProfileFieldState> {
   const base = createDefaultProfile();
-  FIELD_KEYS.forEach((key) => {
+  getFieldConfigKeysSync().forEach((key) => {
     base[key] = { ...base[key], value: '' };
   });
   return base;
@@ -98,6 +104,7 @@ function formatTime(date: Date): string {
 }
 
 function App(): JSX.Element {
+  const [fieldKeys, setFieldKeys] = useState<FieldKey[]>(() => getFieldConfigKeysSync());
   const [profile, setProfile] = useState<Record<FieldKey, ProfileFieldState>>(createEmptyProfile);
   const [status, setStatus] = useState<ExtractionStatus>('idle');
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
@@ -105,42 +112,27 @@ function App(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [progressStep, setProgressStep] = useState<number>(0);
-  const [profilePayload, setProfilePayload] = useState<Record<string, unknown> | null>(
-    () => getCachedProfilePayload(),
-  );
   const progressTimers = useRef<number[]>([]);
 
   const isProcessing = status === 'processing';
   const statusMeta = STATUS_META[status];
 
   const filledCount = useMemo(() => {
-    return FIELD_KEYS.reduce((count, key) => {
+    return fieldKeys.reduce((count, key) => {
       const value = profile[key]?.value.trim() ?? '';
       return value.length > 0 ? count + 1 : count;
     }, 0);
-  }, [profile]);
+  }, [profile, fieldKeys]);
 
   const formattedUpdatedAt = useMemo(() => {
     return lastUpdatedAt ? formatTime(lastUpdatedAt) : null;
   }, [lastUpdatedAt]);
 
-  const summaryProfile = useMemo(() => {
-    const base: Record<string, unknown> = profilePayload ? { ...profilePayload } : {};
-
-    FIELD_KEYS.forEach((key) => {
-      const current = profile[key]?.value;
-      if (typeof current !== 'undefined' && current !== null) {
-        base[key] = current;
-      }
-    });
-
-    return base;
-  }, [profile, profilePayload]);
-
   const applyExternalState = useCallback(
     (nextState: AutoFillState) => {
       setProfile(nextState.profile);
-      const hasValue = FIELD_KEYS.some((key) => nextState.profile[key]?.value?.trim());
+      const keys = getFieldConfigKeysSync();
+      const hasValue = keys.some((key) => nextState.profile[key]?.value?.trim());
       if (hasValue) {
         setStatus((prev) => (prev === 'idle' ? 'success' : prev));
         setLastUpdatedAt(new Date());
@@ -149,24 +141,79 @@ function App(): JSX.Element {
     [setLastUpdatedAt, setProfile, setStatus],
   );
 
+  const persistProfile = useCallback(
+    (next: Record<FieldKey, ProfileFieldState>) => {
+      void saveStateToStorage({
+        panelOpen: true,
+        profile: next,
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
-    let active = true;
-    void ensureProfilePayload()
-      .then((payload) => {
-        if (active) {
-          setProfilePayload(payload);
+    let cancelled = false;
+
+    void ensureFieldConfigsReady()
+      .then(() => {
+        if (!cancelled) {
+          setFieldKeys(getFieldConfigKeysSync());
         }
       })
-      .catch(() => {
-        if (active) {
-          setProfilePayload(null);
-        }
+      .catch((error) => {
+        console.warn('Smart Autofill: gagal memuat konfigurasi field', error);
       });
 
+    const unsubscribe = subscribeToFieldConfigChanges(({ configs, keys }) => {
+      if (cancelled) {
+        return;
+      }
+      setFieldKeys(keys);
+      let profileToPersist: Record<FieldKey, ProfileFieldState> | null = null;
+      setProfile((prev) => {
+        const next = {} as Record<FieldKey, ProfileFieldState>;
+        let changed = Object.keys(prev).length !== keys.length;
+        keys.forEach((key) => {
+          const definition = configs[key];
+          if (!definition) {
+            return;
+          }
+          const existing = prev[key];
+          if (existing) {
+            next[key] = {
+              ...existing,
+              key,
+              label: definition.label,
+              placeholder: definition.placeholder,
+              description: definition.description,
+              inputKind: definition.inputKind,
+            };
+          } else {
+            changed = true;
+            next[key] = {
+              key,
+              label: definition.label,
+              placeholder: definition.placeholder,
+              description: definition.description,
+              value: definition.defaultValue ?? '',
+              enabled: definition.defaultEnabled,
+              inputKind: definition.inputKind,
+            };
+          }
+        });
+        profileToPersist = changed ? next : null;
+        return next;
+      });
+      if (profileToPersist) {
+        persistProfile(profileToPersist);
+      }
+    });
+
     return () => {
-      active = false;
+      cancelled = true;
+      unsubscribe();
     };
-  }, []);
+  }, [persistProfile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,11 +248,6 @@ function App(): JSX.Element {
       });
     };
   }, [applyExternalState]);
-
-  const persistProfile = (next: Record<FieldKey, ProfileFieldState>) => {
-    void saveStateToStorage({ panelOpen: true, profile: next });
-  };
-
   const handleValueChange = (key: FieldKey, value: string) => {
     setProfile((prev) => {
       const next = { ...prev, [key]: { ...prev[key], value } };
@@ -242,7 +284,7 @@ function App(): JSX.Element {
       const extracted = await extractProfileFromPdf(file);
       setProfile((prev) => {
         const next = { ...prev };
-        FIELD_KEYS.forEach((key) => {
+        fieldKeys.forEach((key) => {
           next[key] = { ...prev[key], value: extracted[key] || prev[key].value };
         });
         persistProfile(next);
@@ -268,7 +310,6 @@ function App(): JSX.Element {
     persistProfile(resetProfile);
   };
 
-  // 🧭 Tab handler
   let tabContent: JSX.Element;
   switch (activeTab) {
     case 'overview':
@@ -281,7 +322,7 @@ function App(): JSX.Element {
             uploadedFileName={uploadedFileName}
             formattedUpdatedAt={formattedUpdatedAt}
             filledCount={filledCount}
-            totalFields={FIELD_KEYS.length}
+            totalFields={fieldKeys.length}
             error={error}
             onFileChange={handleFileChange}
             progressTimeline={
@@ -297,11 +338,7 @@ function App(): JSX.Element {
       break;
 
     case 'fields':
-      tabContent = (
-        <ProfilePanel
-          profile={summaryProfile}
-        />
-      );
+      tabContent =  <FieldForm/>;
       break;
 
     case 'chatbot':
@@ -311,7 +348,7 @@ function App(): JSX.Element {
           status={status}
           highlightKeys={HIGHLIGHT_KEYS}
           filledCount={filledCount}
-          totalFields={FIELD_KEYS.length}
+          totalFields={fieldKeys.length}
           onEditProfile={() => setActiveTab('fields')}
         />
       );

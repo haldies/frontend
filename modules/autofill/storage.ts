@@ -1,4 +1,4 @@
-import { STORAGE_KEY } from './config';
+import { STORAGE_KEY, ensureFieldConfigsReady } from './config';
 import { getDefaultState, mergeState, toPersistedState } from './state';
 import { fetchProfileTemplate } from './api';
 import type { FieldKey } from './keys';
@@ -69,6 +69,7 @@ function getCachedTemplate(): Partial<Record<FieldKey, string>> {
 }
 
 export async function loadStateFromStorage(): Promise<AutoFillState> {
+  await ensureFieldConfigsReady();
   const template = await resolveProfileTemplate();
   const defaultState = getDefaultState(template);
   const storage = getExtensionStorage();

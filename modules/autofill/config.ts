@@ -1,17 +1,18 @@
-import { FIELD_KEYS, type FieldKey } from './keys';
+import { getAllFieldsFromDb } from './indexedDb';
+import { DEFAULT_FIELD_KEYS, isDefaultFieldKey, type FieldKey } from './keys';
 import type { FieldDefinition, ProfileFieldState } from './types';
 
 export const STORAGE_KEY = 'smartAutofillState/v1';
 export const MIN_DETECTION_SCORE = 38;
 
-export const FIELD_CONFIGS: Record<FieldKey, FieldDefinition> = {
+export const DEFAULT_FIELD_CONFIGS: Record<FieldKey, FieldDefinition> = {
   fullName: {
     label: 'Nama Lengkap',
     placeholder: 'Contoh: Budi Santoso',
     description: 'Mengisi kolom nama lengkap pada formulir.',
     defaultValue: '',
     defaultEnabled: true,
-    keywords: ['fullname', 'full_name', 'full name', 'name', 'nama', 'nama lengkap', 'person_name'],
+    keywords: ['fullname', 'full_name', 'full name', 'name', 'nama', 'nama lengkap', 'person_name',],
     inputKind: 'text',
     requireKeyword: true,
   },
@@ -23,169 +24,103 @@ export const FIELD_CONFIGS: Record<FieldKey, FieldDefinition> = {
     defaultEnabled: true,
     keywords: ['email', 'e-mail', 'mail', 'alamat email'],
     inputKind: 'email',
-  },
-  phone: {
-    label: 'Nomor Telepon',
-    placeholder: 'Contoh: 021 1234 5678',
-    description: 'Mengisi kolom nomor telepon kantor atau rumah.',
-    defaultValue: '',
-    defaultEnabled: false,
-    keywords: [
-      'phone',
-      'telepon',
-      'telp',
-      'telephone',
-      'contact number',
-      'nomor telepon',
-    ],
-    inputKind: 'tel',
-  },
-  whatsapp: {
-    label: 'Nomor WhatsApp',
-    placeholder: 'Contoh: 0857 1234 5678',
-    description: 'Mengisi kolom nomor WhatsApp yang dapat dihubungi.',
-    defaultValue: '',
-    defaultEnabled: false,
-    keywords: [
-      'whatsapp',
-      'wa',
-      'whatsapp number',
-      'nomor whatsapp',
-      'whatsapps',
-      'whats app',
-      'nomor wa',"Whats Apps Number",
-    ],
-    inputKind: 'tel',
-  },
-  company: {
-    label: 'Perusahaan',
-    placeholder: 'Contoh: PT Nusantara Makmur',
-    description: 'Mengisi kolom nama perusahaan atau organisasi.',
-    defaultValue: '',
-    defaultEnabled: false,
-    keywords: ['company', 'perusahaan', 'organization', 'organisasi', 'instansi', 'kantor'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  jobTitle: {
-    label: 'Jabatan',
-    placeholder: 'Contoh: Product Manager',
-    description: 'Mengisi kolom jabatan, posisi, atau role pekerjaan.',
-    defaultValue: '',
-    defaultEnabled: false,
-    keywords: ['jabatan', 'job', 'position', 'posisi', 'role', 'title', 'occupation'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  placeOfBirth: {
-    label: 'Tempat Lahir',
-    placeholder: 'Contoh: Jakarta',
-    description: 'Mengisi kolom tempat lahir / birth place.',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['place of birth', 'birthplace', 'tempat lahir', 'pob', 'birth place'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  dateOfBirth: {
-    label: 'Tanggal Lahir',
-    placeholder: 'Contoh: 01/01/1995',
-    description: 'Mengisi kolom tanggal lahir (format dd/MM/yyyy).',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['date of birth', 'dob', 'tanggal lahir', 'birth date', 'birthdate'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  university: {
-    label: 'Universitas',
-    placeholder: 'Contoh: Universitas Indonesia',
-    description: 'Mengisi kolom nama universitas atau perguruan tinggi.',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['university', 'universitas', 'college', 'campus', 'alma mater'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  educationLevel: {
-    label: 'Jenjang Pendidikan',
-    placeholder: 'Contoh: S1',
-    description: 'Mengisi kolom level pendidikan terakhir (SMA/SMK, D3, S1, S2, dst).',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['education level', 'level pendidikan', 'jenjang', 'degree level', 'education'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  major: {
-    label: 'Jurusan',
-    placeholder: 'Contoh: Teknik Informatika',
-    description: 'Mengisi kolom jurusan / program studi.',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['major', 'jurusan', 'study program', 'program studi', 'department'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  gpa: {
-    label: 'GPA / IPK',
-    placeholder: 'Contoh: 3.75',
-    description: 'Mengisi kolom IPK atau GPA.',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['gpa', 'ipk', 'grade point', 'nilai ipk'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  experience: {
-    label: 'Pengalaman',
-    placeholder: 'Contoh: 3 tahun pengalaman software engineer',
-    description: 'Mengisi kolom pengalaman kerja atau proyek.',
-    defaultValue: '',
-    defaultEnabled: false,
-    keywords: ['experience', 'pengalaman', 'work experience', 'years experience','Experience'],
-    inputKind: 'textarea',
-    requireKeyword: true,
-  },
-  expectedSalary: {
-    label: 'Ekspektasi Gaji',
-    placeholder: 'Contoh: Rp10.000.000',
-    description: 'Mengisi kolom ekspektasi gaji (gunakan Rupiah).',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['expected salary', 'salary expectation', 'gaji', 'salary'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  linkedin: {
-    label: 'Akun LinkedIn',
-    placeholder: 'Contoh: https://www.linkedin.com/in/username',
-    description: 'Mengisi kolom tautan akun LinkedIn atau profil profesional.',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['linkedin', 'linked account', 'linked profile', 'linkedin url'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
-  referralSource: {
-    label: 'Sumber Info Lowongan',
-    placeholder: 'Contoh: LinkedIn',
-    description: 'Mengisi kolom bagaimana Anda mengetahui lowongan ini.',
-    defaultValue: '',
-    defaultEnabled: true,
-    keywords: ['how did you hear', 'referral', 'vacancy', 'sumber informasi', 'source'],
-    inputKind: 'text',
-    requireKeyword: true,
-  },
+  }
 };
+
+let cachedFieldConfigs: Record<FieldKey, FieldDefinition> = cloneFieldConfigs(DEFAULT_FIELD_CONFIGS);
+let cachedFieldKeys: FieldKey[] = resolveFieldConfigKeys(cachedFieldConfigs);
+let initialized = false;
+let initPromise: Promise<Record<FieldKey, FieldDefinition>> | null = null;
+
+type FieldConfigListener = (payload: {
+  configs: Record<FieldKey, FieldDefinition>;
+  keys: FieldKey[];
+}) => void;
+
+const listeners = new Set<FieldConfigListener>();
+
+export async function ensureFieldConfigsReady(): Promise<Record<FieldKey, FieldDefinition>> {
+  if (initialized) {
+    return cachedFieldConfigs;
+  }
+
+  if (initPromise) {
+    return initPromise;
+  }
+
+  initPromise = (async () => {
+    refreshCachedFieldConfigs(cloneFieldConfigs(DEFAULT_FIELD_CONFIGS));
+    initialized = true;
+    return cachedFieldConfigs;
+  })();
+
+  try {
+    return await initPromise;
+  } finally {
+    initPromise = null;
+  }
+}
+
+export function getFieldConfigsSync(): Record<FieldKey, FieldDefinition> {
+  return cachedFieldConfigs;
+}
+
+export function getFieldConfigKeysSync(): FieldKey[] {
+  return [...cachedFieldKeys];
+}
+
+export function getFieldConfig(key: FieldKey): FieldDefinition | undefined {
+  return cachedFieldConfigs[key];
+}
+
+export function subscribeToFieldConfigChanges(listener: FieldConfigListener): () => void {
+  listeners.add(listener);
+  try {
+    listener({ configs: cachedFieldConfigs, keys: cachedFieldKeys });
+  } catch (error) {
+    console.warn('Smart Autofill: listener konfigurasi field error saat subscribe', error);
+  }
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export async function saveFieldConfig(
+  rawKey: FieldKey,
+  definition: FieldDefinition,
+): Promise<FieldDefinition> {
+  await ensureFieldConfigsReady();
+
+  const key = normaliseFieldKey(rawKey);
+  const nextDefinition = normaliseFieldDefinition({
+    ...definition,
+    label: definition.label || key,
+    placeholder: definition.placeholder ?? '',
+    description: definition.description ?? '',
+    defaultValue: definition.defaultValue ?? '',
+    defaultEnabled: Boolean(definition.defaultEnabled),
+    inputKind: definition.inputKind ?? 'text',
+    requireKeyword: definition.requireKeyword ?? false,
+  });
+
+  const nextConfigs = {
+    ...cachedFieldConfigs,
+    [key]: nextDefinition,
+  };
+
+  refreshCachedFieldConfigs(nextConfigs);
+  return cachedFieldConfigs[key];
+}
 
 export function createDefaultProfile(
   initialValues: Partial<Record<FieldKey, string>> = {},
 ): Record<FieldKey, ProfileFieldState> {
+  const configs = getFieldConfigsSync();
+  const keys = getFieldConfigKeysSync();
   const profile = {} as Record<FieldKey, ProfileFieldState>;
 
-  FIELD_KEYS.forEach((key) => {
-    const config = FIELD_CONFIGS[key];
+  keys.forEach((key) => {
+    const config = configs[key] ?? DEFAULT_FIELD_CONFIGS[key];
     profile[key] = {
       key,
       label: config.label,
@@ -198,4 +133,107 @@ export function createDefaultProfile(
   });
 
   return profile;
+}
+
+
+export async function mergeWithDefaults(stored: FieldDefinition[]): Promise<Record<FieldKey, FieldDefinition>> {
+  const merged = cloneFieldConfigs(DEFAULT_FIELD_CONFIGS);
+
+  const indexedDbFields = await getAllFieldsFromDb(); 
+
+  stored.forEach((item) => {
+    const key = normaliseFieldKey(item.key as FieldKey);
+    const fallback = merged[key];
+
+    
+    const dbField = indexedDbFields.find(field => field.label === item.label); 
+
+    merged[key] = normaliseFieldDefinition({
+      label: dbField?.label ?? fallback?.label ?? key,  
+      placeholder: item.placeholder ?? fallback?.placeholder ?? '',
+      description: item.description ?? fallback?.description ?? '',
+      defaultValue: item.defaultValue ?? fallback?.defaultValue ?? '',
+      defaultEnabled: typeof item.defaultEnabled === 'boolean' ? item.defaultEnabled : fallback?.defaultEnabled ?? false,
+      keywords: dbField?.keywords ?? fallback?.keywords ?? [], 
+      inputKind: item.inputKind ?? fallback?.inputKind ?? 'text',
+      requireKeyword: typeof item.requireKeyword === 'boolean' ? item.requireKeyword : fallback?.requireKeyword ?? false,
+    });
+  });
+  refreshCachedFieldConfigs(merged);
+  console.log('Merged Field Configs:', merged);
+  return merged;
+}
+
+function cloneFieldConfigs(source: Record<FieldKey, FieldDefinition>): Record<FieldKey, FieldDefinition> {
+  const cloned = {} as Record<FieldKey, FieldDefinition>;
+  Object.entries(source).forEach(([rawKey, config]) => {
+    const key = rawKey as FieldKey;
+    if (!config) {
+      return;
+    }
+    cloned[key] = {
+      ...config,
+      keywords: [...config.keywords],
+    };
+  });
+  return cloned;
+}
+
+function normaliseFieldDefinition(definition: FieldDefinition): FieldDefinition {
+  const processed =
+    Array.isArray(definition.keywords)
+      ? definition.keywords
+          .map((keyword) => (typeof keyword === 'string' ? keyword.trim() : ''))
+          .filter((keyword) => keyword.length > 0)
+      : [];
+
+  return {
+    ...definition,
+    keywords: Array.from(new Set(processed)),
+  };
+}
+
+function normaliseFieldKey(raw: FieldKey): FieldKey {
+  const base = String(raw ?? '').trim();
+  if (!base) {
+    throw new Error('Field key tidak boleh kosong');
+  }
+
+  if (isDefaultFieldKey(base)) {
+    return base;
+  }
+
+  const normalized = base
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!normalized) {
+    throw new Error('Field key tidak valid');
+  }
+
+  return normalized;
+}
+
+function resolveFieldConfigKeys(source: Record<FieldKey, FieldDefinition>): FieldKey[] {
+  const keys = Object.keys(source) as FieldKey[];
+  const defaults = DEFAULT_FIELD_KEYS.filter((key) => keys.includes(key as FieldKey)) as FieldKey[];
+  const extras = keys.filter((key) => !defaults.includes(key)).sort();
+  return [...defaults, ...extras];
+}
+
+function refreshCachedFieldConfigs(next: Record<FieldKey, FieldDefinition>): void {
+  cachedFieldConfigs = next;
+  cachedFieldKeys = resolveFieldConfigKeys(next);
+  notifyFieldConfigListeners();
+}
+
+function notifyFieldConfigListeners(): void {
+  listeners.forEach((listener) => {
+    try {
+      listener({ configs: cachedFieldConfigs, keys: cachedFieldKeys });
+    } catch (error) {
+      console.warn('Smart Autofill: listener konfigurasi field error', error);
+    }
+  });
 }

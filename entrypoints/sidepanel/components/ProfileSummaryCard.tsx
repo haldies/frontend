@@ -3,6 +3,8 @@ import type { JSX } from 'react';
 import type { ProfileFieldState } from '@/modules/autofill/types';
 import { User, Pen, Mail, Phone, Linkedin, MapPin, Sparkles } from 'lucide-react';
 
+import PostFormWrapper from './PostFormWrapper';
+
 interface ProfilePanelProps {
   profile: Record<string, unknown>;
   onEditClick?: (section?: string) => void;
@@ -192,14 +194,6 @@ const ProfilePanel = ({ profile, onEditClick }: ProfilePanelProps): JSX.Element 
                   <Linkedin size={14} className="text-indigo-500" /> LinkedIn
                 </a>
               )}
-              {address && (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin size={14} className="text-indigo-500" /> {address}
-                </span>
-              )}
-              {!email && !phone && !linkedin && (
-                <span className="text-slate-400 text-xs italic">Belum ada kontak</span>
-              )}
             </div>
           </div>
         </div>
@@ -210,7 +204,7 @@ const ProfilePanel = ({ profile, onEditClick }: ProfilePanelProps): JSX.Element 
             onClick={() => onEditClick()}
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 hover:shadow"
           >
-            <Pen size={16} /> Ubah Profil
+            <Pen size={16}/> Ubah Profil
           </button>
         ) : null}
       </header>
@@ -278,6 +272,7 @@ const ProfilePanel = ({ profile, onEditClick }: ProfilePanelProps): JSX.Element 
           <span className="text-slate-400 text-sm">Belum ada data keahlian</span>
         )}
       </section>
+      <PostFormWrapper/>
     </section>
   );
 };

@@ -56,7 +56,10 @@ export class SmartAutofillController {
   }
 
   public async start(): Promise<void> {
+    console.log('Starting Smart Autofill Controller...');
     this.state = await loadStateFromStorage();
+    console.log('Loaded state from storage:', this.state);
+    
     this.panel = ensurePanelMount(this.state.panelOpen);
     this.runDetection(false);
     this.observeDomChanges();
@@ -65,18 +68,25 @@ export class SmartAutofillController {
   }
 
   private runDetection(forceFill: boolean): void {
+    console.log('Running detection...');
     this.detections = detectFormFields(this.doc);
+    console.log('Detected fields:', this.detections);
+
     if (!this.panel) {
       this.panel = ensurePanelMount(this.state.panelOpen);
     }
+
     this.renderPanel();
+
     if (forceFill) {
+      console.log('Force filling autofill...');
       this.applyAutofill(true);
     }
   }
 
   private renderPanel(): void {
     if (!this.panel) {
+      console.log('No panel to render.');
       return;
     }
 
@@ -86,6 +96,8 @@ export class SmartAutofillController {
       readyCount > 0
         ? `${readyCount} dari ${total} field cocok dan siap diisi otomatis.`
         : 'Belum ada field yang cocok. Coba fokus pada form yang ingin diisi.';
+
+    console.log('Rendering panel with summary text:', summaryText);
 
     renderPanel({
       mount: this.panel,
@@ -106,12 +118,14 @@ export class SmartAutofillController {
       return;
     }
 
+    console.log('Observing DOM changes...');
     this.mutationObserver = new MutationObserver(() => {
       if (this.scanTimeout !== null) {
         window.clearTimeout(this.scanTimeout);
       }
       this.scanTimeout = window.setTimeout(() => {
         this.scanTimeout = null;
+        console.log('DOM changed, re-running detection...');
         this.runDetection(false);
       }, 150);
     });
@@ -124,6 +138,7 @@ export class SmartAutofillController {
   }
 
   private handleToggle = (key: FieldKey, enabled: boolean): void => {
+    console.log(`Toggling field ${key} to ${enabled ? 'enabled' : 'disabled'}`);
     if (!this.state.profile[key]) {
       return;
     }
@@ -134,6 +149,7 @@ export class SmartAutofillController {
   };
 
   private handleValueChange = (key: FieldKey, value: string): void => {
+    console.log(`Changing value for field ${key} to: ${value}`);
     if (!this.state.profile[key]) {
       return;
     }
@@ -142,10 +158,12 @@ export class SmartAutofillController {
   };
 
   private handleApply = (): void => {
+    console.log('Applying autofill...');
     this.applyAutofill(true);
   };
 
   private handlePanelToggle = (): void => {
+    console.log('Toggling panel visibility');
     this.state.panelOpen = !this.state.panelOpen;
     if (this.panel) {
       this.panel.wrapper.dataset.open = this.state.panelOpen ? 'true' : 'false';
@@ -154,6 +172,7 @@ export class SmartAutofillController {
   };
 
   private applyAutofill(force: boolean): void {
+    console.log('Applying autofill for fields...');
     getFieldKeys().forEach((key) => {
       const profileField = this.state.profile[key];
       if (!profileField?.enabled) {
@@ -162,18 +181,21 @@ export class SmartAutofillController {
 
       const matches = this.detections[key] ?? [];
       matches.forEach((match) => {
+        console.log(`Filling field ${key} with value: ${profileField.value}`);
         applyValueToElement(match.element, profileField.value, force);
       });
     });
   }
 
   private queuePersist(delay = 220): void {
+    console.log('Queueing state persist...');
     if (this.persistTimeout !== null) {
       window.clearTimeout(this.persistTimeout);
     }
 
     this.persistTimeout = window.setTimeout(() => {
       this.persistTimeout = null;
+      console.log('Persisting state to storage:', this.state);
       void saveStateToStorage({
         ...this.state,
         profile: { ...this.state.profile },
@@ -182,6 +204,7 @@ export class SmartAutofillController {
   }
 
   private listenToSharedState(): void {
+    console.log('Listening to shared state changes...');
     if (!this.unsubscribeStorage) {
       this.unsubscribeStorage = subscribeToStateChanges((nextState) => {
         this.applySharedState(nextState);
@@ -196,12 +219,14 @@ export class SmartAutofillController {
   }
 
   private applySharedState(nextState: AutoFillState): void {
+    console.log('Applying shared state:', nextState);
     this.state = nextState;
     this.renderPanel();
     this.applyAutofill(false);
   }
 
   private listenToAgentCommands(): void {
+    console.log('Listening to agent commands...');
     if (this.unsubscribeCommands) {
       return;
     }
@@ -213,6 +238,7 @@ export class SmartAutofillController {
     }
 
     const handler: RuntimeMessageHandler = (message, _sender, sendResponse) => {
+      console.log('Received message from agent:', message);
       if (!message || typeof message !== 'object') {
         return;
       }
@@ -240,7 +266,6 @@ export class SmartAutofillController {
       try {
         events.removeListener(handler);
       } catch {
-        // ignore unsubscribe errors
       }
     };
   }
@@ -249,6 +274,7 @@ export class SmartAutofillController {
     profilePayload: Partial<Record<string, unknown>> | undefined,
     force: boolean,
   ): Promise<void> {
+    console.log('Handling agent fill with profile:', profilePayload);
     const keys = getFieldKeys();
 
     const normalizedFromPayload: Partial<Record<FieldKey, string>> = {};
@@ -268,15 +294,17 @@ export class SmartAutofillController {
       try {
         resolvedProfile = await fetchProfileTemplate();
       } catch (error) {
-        console.warn('Smart Autofill: gagal mengambil data profil dari layanan', error);
+        console.warn('Failed to fetch profile data from service', error);
         resolvedProfile = {};
       }
     }
 
     if (Object.keys(resolvedProfile).length === 0) {
-      console.warn('Smart Autofill: tidak ada data profil untuk diisi dari agent');
+      console.warn('No profile data to fill from agent');
       return;
     }
+
+    console.log('Resolved profile for autofill:', resolvedProfile);
 
     const nextProfile = { ...this.state.profile };
     keys.forEach((key) => {
@@ -303,6 +331,7 @@ export class SmartAutofillController {
   }
 
   private getDetectionSummaryForAgent(): AgentDetectionSummary {
+    console.log('Getting detection summary for agent...');
     const keys = getFieldKeys();
     let totalMatches = 0;
 
@@ -330,6 +359,7 @@ export class SmartAutofillController {
     };
   }
 }
+
 type AgentDetectionFieldSummary = {
   key: FieldKey;
   label: string;

@@ -1,11 +1,14 @@
-import { FIELD_KEYS, type FieldKey } from './keys';
-import { FIELD_CONFIGS, MIN_DETECTION_SCORE } from './config';
+import type { FieldKey } from './keys';
+import { getFieldConfigKeysSync, getFieldConfigsSync, MIN_DETECTION_SCORE } from './config';
 import { createEmptyDetectionMap } from './state';
 import type { DetectionMap, DetectedFieldMatch, FieldDefinition, FieldMatchEvaluation } from './types';
 import { normaliseText } from './utils';
 
 export function detectFormFields(root: Document = document): DetectionMap {
   const map: DetectionMap = createEmptyDetectionMap();
+  const configs = getFieldConfigsSync();
+  console.log('Field Configs for Detection:', configs);
+  const keys = getFieldConfigKeysSync();
   const candidates = Array.from(
     root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'),
   ).filter(isEligibleForAutofill);
@@ -18,8 +21,11 @@ export function detectFormFields(root: Document = document): DetectionMap {
     let selectedMatchedKeyword = false;
     let selectedMatchedAutocomplete = false;
 
-    FIELD_KEYS.forEach((key) => {
-      const config = FIELD_CONFIGS[key];
+    keys.forEach((key) => {
+      const config = configs[key];
+      if (!config) {
+        return;
+      }
       const evaluation = evaluateElementForField(config, element, hintText);
 
       if (!shouldAcceptMatch(config, evaluation)) {
@@ -49,7 +55,7 @@ export function detectFormFields(root: Document = document): DetectionMap {
     }
   });
 
-  FIELD_KEYS.forEach((key) => {
+  keys.forEach((key) => {
     map[key].sort((a, b) => b.score - a.score);
   });
 
@@ -265,7 +271,7 @@ export function filterDetectionsByElement(
   element: HTMLInputElement | HTMLTextAreaElement,
 ): FieldKey | null {
   let foundKey: FieldKey | null = null;
-  FIELD_KEYS.forEach((key) => {
+  getFieldConfigKeysSync().forEach((key) => {
     const matches = detections[key];
     if (matches.some((match) => match.element === element)) {
       foundKey = key;

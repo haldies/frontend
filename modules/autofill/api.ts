@@ -1,4 +1,5 @@
-import { FIELD_KEYS, type FieldKey } from './keys';
+import type { FieldKey } from './keys';
+import { ensureFieldConfigsReady, getFieldConfigKeysSync } from './config';
 
 type ProfileResponse = {
   profile?: Record<string, unknown>;
@@ -110,10 +111,12 @@ export async function ensureProfilePayload(): Promise<Record<string, unknown>> {
 }
 
 export async function fetchProfileTemplate(): Promise<Partial<Record<FieldKey, string>>> {
+  await ensureFieldConfigsReady();
   const source = await fetchProfilePayload();
   const result: Partial<Record<FieldKey, string>> = {};
+  const keys = getFieldConfigKeysSync();
 
-  FIELD_KEYS.forEach((key) => {
+  keys.forEach((key) => {
     const normalized = normalizeValueForField(source[key]);
     if (typeof normalized === 'string' && normalized.trim().length > 0) {
       result[key] = normalized;

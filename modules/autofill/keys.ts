@@ -1,20 +1,11 @@
-export const FIELD_KEYS = [
+export const DEFAULT_FIELD_KEYS = [
   'fullName',
   'email',
-  'phone',
-  'whatsapp',
-  'company',
-  'jobTitle',
-  'placeOfBirth',
-  'dateOfBirth',
-  'university',
-  'educationLevel',
-  'major',
-  'gpa',
-  'experience',
-  'expectedSalary',
-  'linkedin',
-  'referralSource',
 ] as const;
 
-export type FieldKey = (typeof FIELD_KEYS)[number];
+export type DefaultFieldKey = (typeof DEFAULT_FIELD_KEYS)[number];
+export type FieldKey = DefaultFieldKey | (string & Record<never, never>);
+
+export function isDefaultFieldKey(key: string): key is DefaultFieldKey {
+  return (DEFAULT_FIELD_KEYS as readonly string[]).includes(key);
+}

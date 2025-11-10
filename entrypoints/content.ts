@@ -8,6 +8,7 @@ declare global {
 
 export default defineContentScript({
   matches: ['<all_urls>'],
+
   main() {
     if (window.top && window !== window.top) {
       return;
