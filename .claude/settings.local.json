@@ -1,13 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(tree -I 'node_modules|.git|\\.output' -L 3)"
+      "Bash(tree -I 'node_modules|.git|\\.output' -L 3)",
+      "mcp__context7__get-library-docs",
+      "mcp__repomix__file_system_read_directory",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "context7"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

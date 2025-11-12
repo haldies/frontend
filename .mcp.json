@@ -1,8 +1,25 @@
 {
-  "mcpServers": {
-    "context7": {
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp", "--api-key", "ctx7sk-dcf5c073-72f4-4180-993e-de40e81b60bb"]
+    "mcpServers": {
+        "context7": {
+            "command": "cmd",
+            "args": [
+                "/c",
+                "npx",
+                "-y",
+                "@upstash/context7-mcp",
+                "--api-key",
+                "ctx7sk-dcf5c073-72f4-4180-993e-de40e81b60bb"
+            ]
+        },
+        "repomix": {
+            "command": "cmd",
+            "args": [
+                "/c",
+                "npx",
+                "-y",
+                "repomix",
+                "--mcp"
+            ]
+        }
     }
-  }
 }

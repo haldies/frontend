@@ -1,6 +1,6 @@
-import { createDefaultProfile, getFieldConfigKeysSync } from './config';
-import type { AutoFillState, DetectionMap, PersistedState, ProfileFieldState } from './types';
-import type { FieldKey } from './keys';
+import { createDefaultProfile, getFieldConfigKeysSync } from '../core/config';
+import type { AutoFillState, DetectionMap, PersistedState, ProfileFieldState } from '../types/types';
+import type { FieldKey } from '../types/keys';
 
 export function getDefaultState(initialValues?: Partial<Record<FieldKey, string>>): AutoFillState {
   return {

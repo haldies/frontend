@@ -1,10 +1,11 @@
-import type { FieldKey } from './keys';
+import type { FieldKey, FieldId } from './keys';
 
-export type FieldInputKind = 'text' | 'email' | 'tel' | 'textarea';
+export type FieldInputKind = 'text' | 'email' | 'tel' | 'textarea' | 'number' | 'date' | 'password' | 'url';
 
 export interface FieldDefinition {
+  id: number; // Changed to numeric ID
   label: string;
-  placeholder: string;
+  placeholder?: string; // Made optional - will be hardcoded in frontend
   description: string;
   defaultValue: string;
   defaultEnabled: boolean;
@@ -14,7 +15,7 @@ export interface FieldDefinition {
 }
 
 export interface ProfileFieldState {
-  key: FieldKey;
+  key: string; // Use string key for consistency with FieldKey
   label: string;
   placeholder: string;
   description: string;
@@ -25,7 +26,7 @@ export interface ProfileFieldState {
 
 export interface AutoFillState {
   panelOpen: boolean;
-  profile: Record<FieldKey, ProfileFieldState>;
+  profile: Record<string, ProfileFieldState>; // Use string keys for compatibility
 }
 
 export interface PersistedFieldState {
@@ -35,12 +36,12 @@ export interface PersistedFieldState {
 
 export interface PersistedState {
   panelOpen?: unknown;
-  profile?: Partial<Record<FieldKey, PersistedFieldState>>;
+  profile?: Partial<Record<string, PersistedFieldState>>; // Use string keys for compatibility
 }
 
 export interface DetectedValueField {
   type: 'value';
-  key: FieldKey;
+  key: string; // Use string key for consistency with FieldKey
   element: HTMLInputElement | HTMLTextAreaElement;
   score: number;
   matchedKeyword: boolean;
@@ -49,7 +50,19 @@ export interface DetectedValueField {
 
 export type DetectedFieldMatch = DetectedValueField;
 
-export type DetectionMap = Record<FieldKey, DetectedFieldMatch[]>;
+export type DetectionMap = Record<string, DetectedFieldMatch[]>; // Use string keys for compatibility
+
+export interface FieldMatchEvaluation {
+  score: number;
+  matchedKeyword: boolean;
+  matchedAutocomplete: boolean;
+  typeBoost: boolean;
+}
+
+export interface PanelSummary {
+  readyCount: number;
+  total: number;
+}
 
 export interface FieldMatchEvaluation {
   score: number;

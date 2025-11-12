@@ -7,14 +7,14 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { FieldKey } from '@/modules/autofill/keys';
+import type { FieldKey } from '@/modules/autofill/types/keys';
 import {
   createDefaultProfile,
   ensureFieldConfigsReady,
   getFieldConfigKeysSync,
   subscribeToFieldConfigChanges,
-} from '@/modules/autofill/config';
-import type { AutoFillState, ProfileFieldState } from '@/modules/autofill/types';
+} from '@/modules/autofill/core/config';
+import type { AutoFillState, ProfileFieldState } from '@/modules/autofill/types/types';
 import type { ExtractionStatus, StatusMeta, TabId } from './types';
 
 import {
@@ -22,7 +22,7 @@ import {
   saveStateToStorage,
   subscribeToStateChanges,
   subscribeToStateMessages,
-} from '@/modules/autofill/storage';
+} from '@/modules/autofill/storage/storage';
 
 import { extractProfileFromPdf } from './mockExtraction';
 import Header from './components/Header';
@@ -30,16 +30,16 @@ import TabNavigation from './components/TabNavigation';
 import UploadCard from './components/UploadCard';
 import ExtractionProgressTimeline from './components/ExtractionProgressTimeline';
 import ChatbotPanel from './components/ChatbotPanel';
-
-import FieldConfigManager from './components/FieldForm';
-import ProfilePanel from './components/ProfileSummaryCard';
 import FieldForm from './components/FieldForm';
+import ScanFormPanel from './components/ScanFormPanel';
 
-const TABS: Array<{ id: TabId; label: string }> = [
-  { id: 'overview', label: 'Ringkasan' },
-  { id: 'fields', label: 'Kustomisasi Field' },
-  { id: 'chatbot', label: 'Chatbot AI' },
-];
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'fields', label: 'Fields' },
+  { id: 'chatbot', label: 'Chatbot' },
+  { id: 'scanForm', label: 'Scan Form' },
+  { id: 'profile', label: 'Profile' },
+] as const;
 
 const PROGRESS_STEPS = [
   {
@@ -88,7 +88,7 @@ const STATUS_META: Record<ExtractionStatus, StatusMeta> = {
   },
 };
 
-function createEmptyProfile(): Record<FieldKey, ProfileFieldState> {
+function createEmptyProfile(): Record<string, ProfileFieldState> {
   const base = createDefaultProfile();
   getFieldConfigKeysSync().forEach((key) => {
     base[key] = { ...base[key], value: '' };
@@ -104,8 +104,8 @@ function formatTime(date: Date): string {
 }
 
 function App(): JSX.Element {
-  const [fieldKeys, setFieldKeys] = useState<FieldKey[]>(() => getFieldConfigKeysSync());
-  const [profile, setProfile] = useState<Record<FieldKey, ProfileFieldState>>(createEmptyProfile);
+  const [fieldKeys, setFieldKeys] = useState<string[]>(() => getFieldConfigKeysSync());
+  const [profile, setProfile] = useState<Record<string, ProfileFieldState>>(createEmptyProfile);
   const [status, setStatus] = useState<ExtractionStatus>('idle');
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -142,7 +142,7 @@ function App(): JSX.Element {
   );
 
   const persistProfile = useCallback(
-    (next: Record<FieldKey, ProfileFieldState>) => {
+    (next: Record<string, ProfileFieldState>) => {
       void saveStateToStorage({
         panelOpen: true,
         profile: next,
@@ -169,9 +169,9 @@ function App(): JSX.Element {
         return;
       }
       setFieldKeys(keys);
-      let profileToPersist: Record<FieldKey, ProfileFieldState> | null = null;
+      let profileToPersist: Record<string, ProfileFieldState> | null = null;
       setProfile((prev) => {
-        const next = {} as Record<FieldKey, ProfileFieldState>;
+        const next = {} as Record<string, ProfileFieldState>;
         let changed = Object.keys(prev).length !== keys.length;
         keys.forEach((key) => {
           const definition = configs[key];
@@ -184,7 +184,7 @@ function App(): JSX.Element {
               ...existing,
               key,
               label: definition.label,
-              placeholder: definition.placeholder,
+              placeholder: definition.placeholder || '',
               description: definition.description,
               inputKind: definition.inputKind,
             };
@@ -193,7 +193,7 @@ function App(): JSX.Element {
             next[key] = {
               key,
               label: definition.label,
-              placeholder: definition.placeholder,
+              placeholder: definition.placeholder || '',
               description: definition.description,
               value: definition.defaultValue ?? '',
               enabled: definition.defaultEnabled,
@@ -243,12 +243,11 @@ function App(): JSX.Element {
         try {
           unsubscribe();
         } catch {
-          // ignore unsubscribe errors
         }
       });
     };
   }, [applyExternalState]);
-  const handleValueChange = (key: FieldKey, value: string) => {
+  const handleValueChange = (key: string, value: string) => {
     setProfile((prev) => {
       const next = { ...prev, [key]: { ...prev[key], value } };
       persistProfile(next);
@@ -354,12 +353,16 @@ function App(): JSX.Element {
       );
       break;
 
+    case 'scanForm':
+      tabContent = <ScanFormPanel />;
+      break;
+
     default:
       tabContent = <div>Tab tidak ditemukan</div>;
   }
 
   const tabWrapperClassName =
-    activeTab === 'chatbot'
+    activeTab === 'chatbot' || activeTab === 'scanForm'
       ? 'flex flex-1 min-h-0'
       : 'flex-1 min-h-0 overflow-y-auto pr-1';
 

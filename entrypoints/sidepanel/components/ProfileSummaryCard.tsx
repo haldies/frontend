@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { JSX } from 'react';
-import type { ProfileFieldState } from '@/modules/autofill/types';
+import type { ProfileFieldState } from '@/modules/autofill/types/types';
 import { User, Pen, Mail, Phone, Linkedin, MapPin, Sparkles } from 'lucide-react';
 
 import PostFormWrapper from './PostFormWrapper';

@@ -27,5 +27,51 @@ export default defineBackground(() => {
     });
   });
 
+  // Message handler untuk komunikasi antara sidepanel dan content script
+  chromeApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('📨 Background received message:', message);
+    console.log('📨 Message action:', message.action);
+    console.log('📨 Sender tab:', sender.tab?.id);
+
+    if (message.action === 'sendMessageToContentScript') {
+      console.log('🎯 Forwarding message to content script...');
+
+      // Teruskan pesan ke content script di tab aktif
+      chromeApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        console.log('📋 Found tabs:', tabs.length);
+
+        if (tabs && tabs[0]) {
+          const tabId = tabs[0].id;
+          console.log('📤 Sending message to tab:', tabId);
+          console.log('📤 Message content:', message.message);
+
+          chromeApi.tabs.sendMessage(tabId, message.message, (response: any) => {
+            if (chromeApi.runtime.lastError) {
+              console.error('❌ Error sending message to content script:', chromeApi.runtime.lastError);
+              console.error('❌ Tab ID:', tabId);
+              console.error('❌ Message:', message.message);
+              sendResponse({ success: false, error: chromeApi.runtime.lastError.message });
+            } else {
+              console.log('✅ Response from content script:', response);
+              sendResponse({ success: true, response });
+            }
+          });
+        } else {
+          console.error('❌ No active tab found');
+          console.error('❌ Available tabs:', tabs);
+          sendResponse({ success: false, error: 'No active tab found' });
+        }
+      });
+
+      // Return true untuk async response
+      return true;
+    }
+
+    // Default response untuk pesan lain
+    console.log('❓ Unknown message action:', message.action);
+    sendResponse({ success: false, error: 'Unknown action' });
+    return true;
+  });
+
   // Jika Anda memiliki logika Service Worker lain, Anda bisa menambahkannya di sini.
 });

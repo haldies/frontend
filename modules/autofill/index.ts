@@ -1,1 +1,1 @@
-export { SmartAutofillController } from './controller';
+export { SmartAutofillController, getGlobalController, setGlobalController } from './core/controller';

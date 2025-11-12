@@ -1,6 +1,6 @@
 export type ExtractionStatus = 'idle' | 'processing' | 'success' | 'error';
 
-export type TabId = 'overview' | 'fields' | 'chatbot';
+export type TabId = 'overview' | 'fields' | 'chatbot' | 'scanForm' | 'profile';
 
 export interface StatusMeta {
   label: string;

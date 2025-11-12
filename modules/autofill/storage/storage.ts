@@ -1,8 +1,8 @@
-import { STORAGE_KEY, ensureFieldConfigsReady } from './config';
+import { STORAGE_KEY, ensureFieldConfigsReady } from '../core/config';
 import { getDefaultState, mergeState, toPersistedState } from './state';
-import { fetchProfileTemplate } from './api';
-import type { FieldKey } from './keys';
-import type { AutoFillState, PersistedState } from './types';
+import { fetchProfileTemplate } from '../api/api';
+import type { FieldKey } from '../types/keys';
+import type { AutoFillState, PersistedState } from '../types/types';
 
 type ExtensionStorage = {
   get: (keys: unknown, callback?: (items: Record<string, unknown>) => void) => Promise<Record<string, unknown>> | void;

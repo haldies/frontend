@@ -1,5 +1,5 @@
-import type { FieldKey } from './keys';
-import type { DetectionMap } from './types';
+import type { FieldKey } from '../types/keys';
+import type { DetectionMap } from '../types/types';
 
 export function escapeHtml(raw: string): string {
   return raw.replace(/[&<>"']/g, (char) => {

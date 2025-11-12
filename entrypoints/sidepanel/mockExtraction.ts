@@ -1,5 +1,5 @@
-import type { FieldKey } from '@/modules/autofill/keys';
-import { getApiBaseUrl } from '@/modules/autofill/api';
+import type { FieldKey } from '@/modules/autofill/types/keys';
+import { getApiBaseUrl } from '@/modules/autofill/api/api';
 
 export type ExtractedProfile = Partial<Record<FieldKey, string>>;
 

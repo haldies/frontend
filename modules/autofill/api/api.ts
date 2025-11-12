@@ -1,5 +1,5 @@
-import type { FieldKey } from './keys';
-import { ensureFieldConfigsReady, getFieldConfigKeysSync } from './config';
+import type { FieldKey } from '../types/keys';
+import { ensureFieldConfigsReady, getFieldConfigKeysSync } from '../core/config';
 
 type ProfileResponse = {
   profile?: Record<string, unknown>;

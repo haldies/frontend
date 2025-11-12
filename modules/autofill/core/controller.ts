@@ -1,19 +1,20 @@
 import { detectFormFields } from './detection';
-import { ensurePanelMount, renderPanel, type PanelMount } from './ui';
-import { applyValueToElement } from './utils';
-import { countReadyMatches, createEmptyDetectionMap, getDefaultState, getFieldKeys } from './state';
+import { applyValueToElement } from '../utils/utils';
+import { countReadyMatches, createEmptyDetectionMap, getDefaultState, getFieldKeys } from '../storage/state';
 import {
   loadStateFromStorage,
   saveStateToStorage,
   subscribeToStateChanges,
   subscribeToStateMessages,
-} from './storage';
-import { fetchProfileTemplate } from './api';
-import type { AutoFillState, DetectionMap } from './types';
-import type { FieldKey } from './keys';
+} from '../storage/storage';
+import { fetchProfileTemplate } from '../api/api';
+import { ensureFieldConfigsReady, subscribeToFieldConfigChanges, setupIndexedDbChangeListener, getFieldConfigsSync, getFieldConfigKeysSync } from './config';
+import type { AutoFillState, DetectionMap } from '../types/types';
+import type { FieldKey } from '../types/keys';
 
 const AGENT_FILL_EVENT = 'smart-autofill:agent-fill';
 const AGENT_SUMMARY_REQUEST = 'smart-autofill:summary-request';
+const SIDEPANEL_TRIGGER_DETECTION = 'smart-autofill:sidepanel-trigger-detection';
 
 type RuntimeMessageHandler = (
   message: unknown,
@@ -42,13 +43,13 @@ function getExtensionRuntime(): RuntimeApi | null {
 export class SmartAutofillController {
   private state: AutoFillState = getDefaultState();
   private detections: DetectionMap = createEmptyDetectionMap();
-  private panel: PanelMount | null = null;
   private mutationObserver: MutationObserver | null = null;
   private scanTimeout: number | null = null;
   private persistTimeout: number | null = null;
   private unsubscribeStorage: (() => void) | null = null;
   private unsubscribeMessages: (() => void) | null = null;
   private unsubscribeCommands: (() => void) | null = null;
+  private unsubscribeFieldConfigs: (() => void) | null = null;
   private readonly doc: Document;
 
   constructor(doc: Document = document) {
@@ -59,12 +60,15 @@ export class SmartAutofillController {
     console.log('Starting Smart Autofill Controller...');
     this.state = await loadStateFromStorage();
     console.log('Loaded state from storage:', this.state);
-    
-    this.panel = ensurePanelMount(this.state.panelOpen);
+
     this.runDetection(false);
     this.observeDomChanges();
     this.listenToSharedState();
     this.listenToAgentCommands();
+
+    // Set up field config change listener for auto-redetection
+    console.log('🔄 Setting up field config change listener for auto-redetection...');
+    this.listenToFieldConfigChanges();
   }
 
   private runDetection(forceFill: boolean): void {
@@ -72,46 +76,13 @@ export class SmartAutofillController {
     this.detections = detectFormFields(this.doc);
     console.log('Detected fields:', this.detections);
 
-    if (!this.panel) {
-      this.panel = ensurePanelMount(this.state.panelOpen);
-    }
-
-    this.renderPanel();
-
     if (forceFill) {
       console.log('Force filling autofill...');
       this.applyAutofill(true);
     }
   }
 
-  private renderPanel(): void {
-    if (!this.panel) {
-      console.log('No panel to render.');
-      return;
-    }
 
-    const readyCount = countReadyMatches(this.detections);
-    const total = getFieldKeys().length;
-    const summaryText =
-      readyCount > 0
-        ? `${readyCount} dari ${total} field cocok dan siap diisi otomatis.`
-        : 'Belum ada field yang cocok. Coba fokus pada form yang ingin diisi.';
-
-    console.log('Rendering panel with summary text:', summaryText);
-
-    renderPanel({
-      mount: this.panel,
-      state: this.state,
-      detections: this.detections,
-      summaryText,
-      handlers: {
-        onToggle: this.handleToggle,
-        onValueChange: this.handleValueChange,
-        onApply: this.handleApply,
-        onPanelToggle: this.handlePanelToggle,
-      },
-    });
-  }
 
   private observeDomChanges(): void {
     if (this.mutationObserver) {
@@ -145,7 +116,6 @@ export class SmartAutofillController {
     this.state.profile[key].enabled = enabled;
     this.queuePersist(0);
     this.applyAutofill(false);
-    this.renderPanel();
   };
 
   private handleValueChange = (key: FieldKey, value: string): void => {
@@ -165,9 +135,6 @@ export class SmartAutofillController {
   private handlePanelToggle = (): void => {
     console.log('Toggling panel visibility');
     this.state.panelOpen = !this.state.panelOpen;
-    if (this.panel) {
-      this.panel.wrapper.dataset.open = this.state.panelOpen ? 'true' : 'false';
-    }
     this.queuePersist(0);
   };
 
@@ -221,7 +188,6 @@ export class SmartAutofillController {
   private applySharedState(nextState: AutoFillState): void {
     console.log('Applying shared state:', nextState);
     this.state = nextState;
-    this.renderPanel();
     this.applyAutofill(false);
   }
 
@@ -238,7 +204,7 @@ export class SmartAutofillController {
     }
 
     const handler: RuntimeMessageHandler = (message, _sender, sendResponse) => {
-      console.log('Received message from agent:', message);
+      console.log('📨 Received message:', message);
       if (!message || typeof message !== 'object') {
         return;
       }
@@ -251,6 +217,12 @@ export class SmartAutofillController {
 
       if (payload.type === AGENT_SUMMARY_REQUEST) {
         sendResponse(this.getDetectionSummaryForAgent());
+        return;
+      }
+
+      if (payload.type === SIDEPANEL_TRIGGER_DETECTION) {
+        console.log('🔄 Received sidepanel trigger detection request');
+        void this.handleSidepanelDetectionRequest();
         return;
       }
 
@@ -268,6 +240,78 @@ export class SmartAutofillController {
       } catch {
       }
     };
+  }
+
+  public async enableCustomFieldsSupport(): Promise<void> {
+    console.log('🚀 Enabling custom fields support...');
+
+    try {
+      console.log('ℹ️ IndexedDB support has been disabled');
+      setupIndexedDbChangeListener();
+
+      console.log('📞 Calling ensureFieldConfigsReady()...');
+      await ensureFieldConfigsReady();
+      console.log('✅ ensureFieldConfigsReady() completed');
+
+      console.log('📞 Setting up field config change listener...');
+      this.listenToFieldConfigChanges();
+      console.log('✅ Field config change listener setup completed');
+
+      // Run detection immediately after enabling custom fields support
+      console.log('🔍 Running detection with default field configurations...');
+      this.runDetection(false);
+      console.log('✅ Detection completed');
+
+      console.log('🎉 Field configurations ready and detection completed');
+    } catch (error) {
+      console.error('❌ Error in enableCustomFieldsSupport():', error);
+      throw error;
+    }
+  }
+
+  public triggerDetection(): void {
+    console.log('🔍 Manual detection triggered...');
+    console.log('📋 Current field configs:', getFieldConfigsSync());
+    console.log('🔑 Available field keys:', getFieldConfigKeysSync());
+    this.runDetection(false);
+  }
+
+  private listenToFieldConfigChanges(): void {
+    console.log('Listening to field config changes...');
+    if (this.unsubscribeFieldConfigs) {
+      return;
+    }
+
+    this.unsubscribeFieldConfigs = subscribeToFieldConfigChanges(({ configs, keys }) => {
+      console.log('Field configs changed, re-running detection...');
+      console.log('New configs:', configs);
+      console.log('New keys:', keys);
+
+      // Re-run detection with updated field configurations
+      this.runDetection(false);
+    });
+  }
+
+  public async handleSidepanelDetectionRequest(): Promise<void> {
+    console.log('🚀 Handling sidepanel detection request...');
+
+    try {
+      // Set up listeners if not already set up
+      if (!this.unsubscribeFieldConfigs) {
+        console.log('🔄 Setting up listeners for first time...');
+        setupIndexedDbChangeListener();
+        this.listenToFieldConfigChanges();
+      }
+
+      // Load field configurations when requested
+      console.log('🔄 Loading field configurations...');
+      await ensureFieldConfigsReady();
+
+      console.log('🔍 Running detection with field configurations...');
+      this.triggerDetection();
+    } catch (error) {
+      console.error('❌ Error handling sidepanel detection request:', error);
+    }
   }
 
   private async handleAgentFill(
@@ -372,3 +416,14 @@ type AgentDetectionSummary = {
   totalMatches: number;
   fields: AgentDetectionFieldSummary[];
 };
+
+// Global controller instance for external access
+let globalController: SmartAutofillController | null = null;
+
+export function getGlobalController(): SmartAutofillController | null {
+  return globalController;
+}
+
+export function setGlobalController(controller: SmartAutofillController): void {
+  globalController = controller;
+}
